@@ -45,4 +45,4 @@ if __name__ == "__main__":
             empty += 1
     print(count, empty)
 
-    data = [(hand_pose_dict[id]["pred_output_list"][0]["right_hand"], img_dict[id]) for id in hand_pose_dict.keys()] 
+    data = [(img_dict[id], hand_pose_dict[id]["pred_output_list"][0]["right_hand"]) for id in hand_pose_dict.keys()] 
