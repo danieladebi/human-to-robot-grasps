@@ -5,10 +5,9 @@ import torchvision
 from tqdm import tqdm
 import re
 
-def load_data():
-    mocap_dir = "/home/ida338/frankmocap/demo/results/mocap"
-    rendered_dir = "/home/ida338/frankmocap/demo/results/rendered"
+import argparse
 
+def load_data(mocap_dir, rendered_dir):
     hand_poses = {}
     imgs = {}
 
@@ -32,5 +31,18 @@ def load_data():
     return hand_poses, imgs
 
 if __name__ == "__main__":
-    hand_pose_dict, img_dict = load_data()
-    data = [(hand_pose_dict[id], img_dict[id]) for id in hand_pose_dict.keys()] 
+    mocap_dir = "/home/ida338/frankmocap/demo/results/mocap"
+    rendered_dir = "/home/ida338/frankmocap/demo/results/rendered"
+
+    hand_pose_dict, img_dict = load_data(mocap_dir, rendered_dir)
+    count = 0
+    empty = 0
+    for i in hand_pose_dict:
+        d = hand_pose_dict[i]['pred_output_list'][0]["right_hand"]
+        if d:
+            count += 1
+        else: 
+            empty += 1
+    print(count, empty)
+
+    data = [(hand_pose_dict[id]["pred_output_list"][0]["right_hand"], img_dict[id]) for id in hand_pose_dict.keys()] 
