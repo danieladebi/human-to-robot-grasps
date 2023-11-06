@@ -13,6 +13,6 @@ class HandPoseModel(nn.Module):
     def forward(self, x):
         return self.base_model(x)
 
-# print(HandPoseModel())
+print(HandPoseModel())
     
 
