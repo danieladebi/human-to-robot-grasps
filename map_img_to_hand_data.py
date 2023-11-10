@@ -5,7 +5,7 @@ import torchvision
 import pickle
 import matplotlib.pyplot as plt
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset
 from torchvision.transforms import ToTensor
 from torchvision.io import read_image
 
@@ -81,6 +81,14 @@ if __name__ == "__main__":
     rendered_dir = "/mnt/zhang-nas/ikadebi/handpose-data/imgs"
 
     dataset = HandPoseDataset(mocap_dir, rendered_dir)
+    print(len(dataset))
     plt.imshow(dataset[0][0].permute(1,2,0))
     print(dataset[0][0].shape)
     plt.savefig("sample.png")
+
+    count = 0 
+    for i in tqdm(range(len(dataset))):
+        if dataset[1]:
+            count += 1
+
+    print(count)
