@@ -10,9 +10,10 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
-# print(HandPoseModel())
+EPOCHS = 10
+batch_size = 64
 
-def train_one_epoch(train_loader, epoch_index, tb_writer, optim, scheduler):
+def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
     running_loss = 0.
     last_loss = 0.
 
@@ -22,16 +23,16 @@ def train_one_epoch(train_loader, epoch_index, tb_writer, optim, scheduler):
 
         optim.zero_grad()
 
-        pred_hp = model(img).reshape(21,3)
+        pred_hp = model(img).reshape(-1, 21,3)
+        hp = hp.reshape(-1, 21, 3)
 
         loss = loss_fn(pred_hp, hp)
         loss.backward()
 
         optimizer.step()
-        scheduler.step()
 
         running_loss += loss.item()
-        if i % 1000 === 999:
+        if i % 1000 == 999:
             last_loss = running_loss / 1000 # loss per batch
             print('  batch {} loss: {}'.format(i + 1, last_loss))
             tb_x = epoch_index * len(train_loader) + i + 1
@@ -76,15 +77,13 @@ if __name__ == "__main__":
 
     epoch_number = 0
 
-    EPOCHS = 10
-
     best_vloss = float("inf")
 
     for epoch in range(EPOCHS):
         print(f"EPOCH {epoch_number + 1}:")
 
         model.train(True)
-        avg_loss = train_one_epoch(train_loader, epoch_number, writer, optimizer, scheduler)
+        avg_loss = train_one_epoch(train_loader, epoch_number, writer, optimizer)
 
         running_vloss = 0.0
         model.eval()
@@ -113,4 +112,5 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), model_path)
 
         epoch_number += 1
+        scheduler.step(avg_vloss)
   
