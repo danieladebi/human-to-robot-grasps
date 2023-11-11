@@ -12,12 +12,32 @@ from datetime import datetime
 
 # print(HandPoseModel())
 
-def train_one_epoch(train_loader, epoch_index, tb_writer):
+def train_one_epoch(train_loader, epoch_index, tb_writer, optim, scheduler):
     running_loss = 0.
     last_loss = 0.
 
     for i, data in enumerate(train_loader):
-        pass
+        img, hp = data
+        img, hp = img.to(device), hp.to(device)
+
+        optim.zero_grad()
+
+        pred_hp = model(img).reshape(21,3)
+
+        loss = loss_fn(pred_hp, hp)
+        loss.backward()
+
+        optimizer.step()
+        scheduler.step()
+
+        running_loss += loss.item()
+        if i % 1000 === 999:
+            last_loss = running_loss / 1000 # loss per batch
+            print('  batch {} loss: {}'.format(i + 1, last_loss))
+            tb_x = epoch_index * len(train_loader) + i + 1
+            tb_writer.add_scalar('Loss/train', last_loss, tb_x)
+            running_loss = 0.
+
     
     return last_loss
 
@@ -64,7 +84,7 @@ if __name__ == "__main__":
         print(f"EPOCH {epoch_number + 1}:")
 
         model.train(True)
-        avg_loss = train_one_epoch(train_loader, epoch_number, writer)
+        avg_loss = train_one_epoch(train_loader, epoch_number, writer, optimizer, scheduler)
 
         running_vloss = 0.0
         model.eval()
