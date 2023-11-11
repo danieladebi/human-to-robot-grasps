@@ -19,14 +19,14 @@ def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
     running_loss = 0.
     last_loss = 0.
 
+    period = 500
     for i, data in tqdm(enumerate(train_loader)):
         img, hp = data
         img, hp = img.to(device), hp.to(device)
 
         optim.zero_grad()
 
-        pred_hp = model(img)
-        hp = hp.reshape(-1, 63)
+        pred_hp = model(img).reshape(-1, 21, 3)
 
         loss = loss_fn(pred_hp, hp)
         loss.backward()
@@ -34,8 +34,8 @@ def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
         optimizer.step()
 
         running_loss += loss.item()
-        if i % 1000 == 999:
-            last_loss = running_loss / 1000 # loss per batch
+        if i % period == period-1:
+            last_loss = running_loss / period # loss per batch
             print('  batch {} loss: {}'.format(i + 1, last_loss))
             tb_x = epoch_index * len(train_loader) + i + 1
             tb_writer.add_scalar('Loss/train', last_loss, tb_x)
@@ -93,9 +93,9 @@ if __name__ == "__main__":
         with torch.no_grad():
             for i, vdata in enumerate(val_loader):
                 v_img, v_hp = vdata
-                v_hp = v_hp.reshape(-1, 63)
-                
-                v_pred_hp = model(v_img)
+                v_img, v_hp = v_img.to(device), v_hp.to(device)
+                v_pred_hp = model(v_img).reshape(-1, 21, 3)
+
                 vloss = loss_fn(v_pred_hp, v_hp)
                 running_vloss += vloss
 
