@@ -25,8 +25,8 @@ def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
 
         optim.zero_grad()
 
-        pred_hp = model(img).reshape(-1, 21,3)
-        hp = hp.reshape(-1, 21, 3)
+        pred_hp = model(img)
+        hp = hp.reshape(-1, 63)
 
         loss = loss_fn(pred_hp, hp)
         loss.backward()
@@ -58,16 +58,16 @@ if __name__ == "__main__":
     train_data, val_data, test_data = torch.utils.data.random_split(hp_dataset, [0.85, 0.05, 0.10])
     print(len(train_data), len(val_data), len(test_data))
 
-    train_loader = DataLoader(train_data, batch_size=64, shuffle=True)
-    val_loader = DataLoader(val_data, batch_size=64, shuffle=False)
-    test_loader = DataLoader(test_data, batch_size=64, shuffle=False)
+    train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print("DEVICE:",device)
 
     model = nn.DataParallel(HandPoseModel()).to(device) # HandPoseModel()
     sample = train_data[0][0].unsqueeze(0).to(device)
-    print(model(sample))
+    #print(model(sample))
     # print(sample.shape)
 
     loss_fn = nn.MSELoss()
