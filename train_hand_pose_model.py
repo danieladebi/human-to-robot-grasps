@@ -92,9 +92,11 @@ if __name__ == "__main__":
 
         with torch.no_grad():
             for i, vdata in enumerate(val_loader):
-                vinputs, vlabels = vdata
-                voutputs = model(vinputs)
-                vloss = loss_fn(voutputs, vlabels)
+                v_img, v_hp = vdata
+                v_hp = v_hp.reshape(-1, 63)
+                
+                v_pred_hp = model(v_img)
+                vloss = loss_fn(v_pred_hp, v_hp)
                 running_vloss += vloss
 
         avg_vloss = running_vloss / (i+1)
