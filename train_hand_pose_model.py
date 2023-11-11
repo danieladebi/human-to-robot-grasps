@@ -14,7 +14,7 @@ from datetime import datetime
 
 from tqdm import tqdm
 
-EPOCHS = 10
+EPOCHS = 50
 batch_size = 64
 
 def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
