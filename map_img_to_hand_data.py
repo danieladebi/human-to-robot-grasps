@@ -15,7 +15,7 @@ from tqdm import tqdm
 import argparse
 
 class HandPoseDataset(Dataset):
-    def __init__(self, mocap_dir, rendered_dir, transform=None):
+    def __init__(self, mocap_dir="/mnt/zhang-nas/ikadebi/handpose-data/mocap", rendered_dir="/mnt/zhang-nas/ikadebi/handpose-data/imgs", transform=None):
         self.pose_dir = mocap_dir
         self.img_dir = rendered_dir
         self.transform = transform
@@ -24,9 +24,9 @@ class HandPoseDataset(Dataset):
         self.handpose_ids = []
 
         self.get_file_ids()
-    
+        self.check_valid_samples()
+  
     def get_file_ids(self):
-
         for pkl_filename in tqdm(os.listdir(self.pose_dir)):
             pkl_filepath = os.path.join(self.pose_dir, pkl_filename)
             id = re.findall(r'\d+', pkl_filename)[0]
@@ -44,10 +44,12 @@ class HandPoseDataset(Dataset):
         self.handpose_ids = sorted(ids)
         self.img_ids = sorted(ids)
 
+        self.check_data_invariance()
+
+    def check_data_invariance(self):
         assert(self.handpose_ids == self.img_ids)
         for hp_id, img_id in zip(self.handpose_ids, self.img_ids):
             assert(hp_id == img_id)
-        
 
     def __len__(self):
         return len(self.img_ids)
@@ -68,13 +70,33 @@ class HandPoseDataset(Dataset):
                 f.seek(0)
                 hand_pose_dict = pickle.load(f, encoding='latin1')
 
-        hand_pose = hand_pose_dict["pred_output_list"][0]["right_hand"]["pred_joints_img"]
+        try:
+            hand_pose = hand_pose_dict["pred_output_list"][0]["right_hand"]["pred_joints_img"]
+        except:
+            hand_pose = None  #(add left hand data?)
 
         if self.transform:
             img = self.transform(img)
 
         return img, hand_pose
 
+    def check_valid_samples(self):
+        count = 0
+        pbar = tqdm(range(len(self.handpose_ids)))
+        bad_ids = []
+        for id in pbar:
+            if self[id][1] is None:
+                count += 1
+                bad_ids.append(self.handpose_ids[id])
+            pbar.set_postfix({'no hand pose count': count})
+
+        self.handpose_ids = list(set(self.handpose_ids) - set(bad_ids))
+        self.img_ids = list(set(self.img_ids) - set(bad_ids))
+
+        self.handpose_ids.sort()
+        self.img_ids.sort()
+        
+        self.check_data_invariance()
 
 if __name__ == "__main__":
     mocap_dir = "/mnt/zhang-nas/ikadebi/handpose-data/mocap"
@@ -84,11 +106,11 @@ if __name__ == "__main__":
     print(len(dataset))
     plt.imshow(dataset[0][0].permute(1,2,0))
     print(dataset[0][0].shape)
-    plt.savefig("sample.png")
+    plt.savefig("sample.jpg")
 
     count = 0 
     for i in tqdm(range(len(dataset))):
         if dataset[1]:
             count += 1
 
-    print(count)
+
