@@ -1,3 +1,5 @@
+import os
+
 from hand_pose_model import HandPoseModel
 from map_img_to_hand_data import HandPoseDataset
 from torch.utils.data import DataLoader
@@ -113,6 +115,8 @@ if __name__ == "__main__":
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
             model_path = 'hand_pose_model/model_{}_{}'.format(timestamp, epoch_number)
+            if not os.path.exists("hand_pose_model"):
+                os.makedirs("hand_pose_model", exist_ok=True)
             torch.save(model.state_dict(), model_path)
 
         epoch_number += 1
