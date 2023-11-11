@@ -10,6 +10,8 @@ import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 
+from tqdm import tqdm
+
 EPOCHS = 10
 batch_size = 64
 
@@ -17,7 +19,7 @@ def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
     running_loss = 0.
     last_loss = 0.
 
-    for i, data in enumerate(train_loader):
+    for i, data in tqdm(enumerate(train_loader)):
         img, hp = data
         img, hp = img.to(device), hp.to(device)
 
