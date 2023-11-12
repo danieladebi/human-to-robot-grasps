@@ -15,7 +15,8 @@ from datetime import datetime
 from tqdm import tqdm
 
 EPOCHS = 50
-batch_size = 64
+batch_size = 64 #64
+train = False
 
 def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
     running_loss = 0.
@@ -47,10 +48,13 @@ def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
     return last_loss
 
 if __name__ == "__main__":
- 
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    print("DEVICE:",device)
+
     transform = transforms.Compose(
         [transforms.ToPILImage(),
         transforms.ToTensor(),
+        #transforms.ColorJitter(0.5, 0.2, 0.2, 0.1),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                             std=[0.229, 0.224, 0.225]) ])
 
@@ -64,61 +68,74 @@ if __name__ == "__main__":
     val_loader = DataLoader(val_data, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
-    print("DEVICE:",device)
+    if not train:
+        model = nn.DataParallel(HandPoseModel()).to(device)
+        model.load_state_dict(torch.load("hand_pose_model/best_model"))
 
-    model = nn.DataParallel(HandPoseModel()).to(device) # HandPoseModel()
-    sample = train_data[0][0].unsqueeze(0).to(device)
-    #print(model(sample))
-    # print(sample.shape)
+        total_error = 0
+        for i, tdata in enumerate(test_loader):
+            t_img, t_hp = tdata
+            t_img, t_hp = t_img.to(device), t_hp.to(device)
+            t_pred_hp = model(t_img).reshape(-1, 21, 3)
 
-    loss_fn = nn.MSELoss()
-    optimizer = optim.Adam(model.parameters(), lr=0.001)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2)
+            error = nn.functional.mse_loss(t_pred_hp, t_hp)
+            total_error += error
+        
+        avg_error = total_error/(i+1)
+        print(f"Final Error: {avg_error}")
+    else:
+        model = nn.DataParallel(HandPoseModel()).to(device) # HandPoseModel()
+        sample = train_data[0][0].unsqueeze(0).to(device)
+        #print(model(sample))
+        # print(sample.shape)
 
-    timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-    writer = SummaryWriter(f"runs/hand_pose_trainer_{timestamp}")
+        loss_fn = nn.MSELoss()
+        optimizer = optim.Adam(model.parameters(), lr=0.001)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, factor=0.5, patience=2)
 
-    epoch_number = 0
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        writer = SummaryWriter(f"runs/hand_pose_trainer_{timestamp}")
 
-    best_vloss = float("inf")
+        epoch_number = 0
 
-    for epoch in range(EPOCHS):
-        print(f"EPOCH {epoch_number + 1}:")
+        best_vloss = float("inf")
 
-        model.train(True)
-        avg_loss = train_one_epoch(train_loader, epoch_number, writer, optimizer)
+        for epoch in range(EPOCHS):
+            print(f"EPOCH {epoch_number + 1}:")
 
-        running_vloss = 0.0
-        model.eval()
+            model.train(True)
+            avg_loss = train_one_epoch(train_loader, epoch_number, writer, optimizer)
 
-        with torch.no_grad():
-            for i, vdata in enumerate(val_loader):
-                v_img, v_hp = vdata
-                v_img, v_hp = v_img.to(device), v_hp.to(device)
-                v_pred_hp = model(v_img).reshape(-1, 21, 3)
+            running_vloss = 0.0
+            model.eval()
 
-                vloss = loss_fn(v_pred_hp, v_hp)
-                running_vloss += vloss
+            with torch.no_grad():
+                for i, vdata in enumerate(val_loader):
+                    v_img, v_hp = vdata
+                    v_img, v_hp = v_img.to(device), v_hp.to(device)
+                    v_pred_hp = model(v_img).reshape(-1, 21, 3)
 
-        avg_vloss = running_vloss / (i+1)
-        print('LOSS train {} valid {}'.format(avg_loss, avg_vloss))
+                    vloss = loss_fn(v_pred_hp, v_hp)
+                    running_vloss += vloss
 
-        # Log the running loss averaged per batch
-        # for both training and validation
-        writer.add_scalars('Training vs. Validation Loss',
-                        { 'Training' : avg_loss, 'Validation' : avg_vloss },
-                        epoch_number + 1)
-        writer.flush()
+            avg_vloss = running_vloss / (i+1)
+            print('LOSS train {} valid {}'.format(avg_loss, avg_vloss))
 
-        # Track best performance, and save the model's state
-        if avg_vloss < best_vloss:
-            best_vloss = avg_vloss
-            model_path = 'hand_pose_model/model_{}_{}'.format(timestamp, epoch_number)
-            if not os.path.exists("hand_pose_model"):
-                os.makedirs("hand_pose_model", exist_ok=True)
-            torch.save(model.state_dict(), model_path)
+            # Log the running loss averaged per batch
+            # for both training and validation
+            writer.add_scalars('Training vs. Validation Loss',
+                            { 'Training' : avg_loss, 'Validation' : avg_vloss },
+                            epoch_number + 1)
+            writer.flush()
 
-        epoch_number += 1
-        scheduler.step(avg_vloss)
-  
+            # Track best performance, and save the model's state
+            if avg_vloss < best_vloss:
+                best_vloss = avg_vloss
+                model_path = f'hand_pose_model/best_model_{epoch_number}' # model_{}_{}'.format(timestamp, epoch_number)
+                if not os.path.exists("hand_pose_model"):
+                    os.makedirs("hand_pose_model", exist_ok=True)
+                torch.save(model.state_dict(), model_path)
+
+            epoch_number += 1
+            scheduler.step(avg_vloss)
+    
