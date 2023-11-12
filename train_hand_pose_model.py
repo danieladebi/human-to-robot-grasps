@@ -54,7 +54,6 @@ if __name__ == "__main__":
     transform = transforms.Compose(
         [transforms.ToPILImage(),
         transforms.ToTensor(),
-        #transforms.ColorJitter(0.5, 0.2, 0.2, 0.1),
         transforms.Normalize(mean=[0.485, 0.456, 0.406],
                             std=[0.229, 0.224, 0.225]) ])
 
