@@ -16,7 +16,7 @@ from tqdm import tqdm
 
 EPOCHS = 50
 batch_size = 64 #64
-train = False
+train = True
 
 def train_one_epoch(train_loader, epoch_index, tb_writer, optim):
     running_loss = 0.
@@ -69,7 +69,7 @@ if __name__ == "__main__":
     test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
 
     if not train:
-        model = nn.DataParallel(HandPoseModel()).to(device)
+        model = HandPoseModel().to(device) #nn.DataParallel(HandPoseModel()).to(device)
         model.load_state_dict(torch.load("hand_pose_model/best_model"))
 
         total_error = 0
@@ -134,7 +134,7 @@ if __name__ == "__main__":
                 model_path = f'hand_pose_model/best_model_{epoch_number}' # model_{}_{}'.format(timestamp, epoch_number)
                 if not os.path.exists("hand_pose_model"):
                     os.makedirs("hand_pose_model", exist_ok=True)
-                torch.save(model.state_dict(), model_path)
+                torch.save(model.module.state_dict(), model_path)
 
             epoch_number += 1
             scheduler.step(avg_vloss)
