@@ -52,7 +52,7 @@ env.save('trained_models/vec_normalize_' + filename + '.pkl') # Save VecNomraliz
 
 env_test = GymWrapper(
     robosuite.make(
-        'Lift',
+        'Lift', #Block Lifting | Block Stacking | Pick and Place | Nut Assembly | Door Opening | Table Wiping
         robots="Panda",
         controller_configs=controller_config,
         gripper_typers="default",
