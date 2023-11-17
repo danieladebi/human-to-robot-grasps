@@ -10,7 +10,10 @@ from stable_baselines3 import PPO
 from stable_baselines3.common.save_util import save_to_zip_file, load_from_zip_file
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+import robomimic.utils.env_utils as EnvUtils
+import robomimic.utils.file_utils as FileUtils
 from VIPWrapper import VIPWrapper
+from VIPGoalLoader import VIPGoalLoader
 from vip import load_vip
 
 controller_config = load_controller_config(default_controller="OSC_POSE")
@@ -31,6 +34,17 @@ rs_env = robosuite.make(
     camera_heights=84,
     camera_widths=84,
     reward_shaping=True
+)
+
+goal_dataset = VIPGoalLoader("lift")
+env_meta = FileUtils.get_env_metadata_from_dataset(goal_dataset.processed_dataset_path)
+
+env = EnvUtils.create_env_from_metadata(
+    env_meta=env_meta,
+    env_name=env_meta["env_name"],
+    render=False,
+    render_offscreen=True,
+    use_image_obs=False,
 )
         
 
