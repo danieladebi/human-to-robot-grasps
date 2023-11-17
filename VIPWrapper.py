@@ -21,8 +21,11 @@ class VIPWrapper(GymWrapper, Env):
         AssertionError: [Object observations must be enabled if no keys]
     """
 
-    def __init__(self, env, vip_model, goal_image, use_vip_embedding_obs=True,
+    def __init__(self, env, vip_model, goal_image, 
+                 use_vip_embedding_obs=True,
+                 use_hand_pose_obs=True,
                  use_vip_reward=True, vip_reward_type='add', 
+                 vip_reward_min=-1, vip_reward_max=1,
                  vip_reward_interval=1, keys=None):
         self.vip_model = vip_model
         self.vip_model.to('cuda')
@@ -76,6 +79,7 @@ class VIPWrapper(GymWrapper, Env):
 
         # set up observation and action spaces
         obs = self.env.reset()
+        self.latest_ob_dict = obs
         self.modality_dims = {key: obs[key].shape for key in self.keys}
         
         for key in embedding_keys:
@@ -191,7 +195,8 @@ class VIPWrapper(GymWrapper, Env):
                 reward += vip_reward
             else:
                 reward *= vip_reward
-
+                
+        self.latest_ob_dict = ob_dict
         return obs, reward, done, info
 
     def seed(self, seed=None):
