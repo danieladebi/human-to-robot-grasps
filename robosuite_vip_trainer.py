@@ -137,8 +137,8 @@ def trainer(args):
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
         total_r += reward
-        filepath = os.path.join(image_folder, 'img' + str(i) + '.png')
-        cv2.imwrite(filepath, env.envs[0].gym_env.latest_obs_dict['agentview_image'])
+        image_filepath = os.path.join(image_folder, 'img' + str(i) + '.png')
+        cv2.imwrite(image_filepath, env.envs[0].gym_env.latest_obs_dict['agentview_image'])
         i += 1
 
         if done: 
@@ -146,7 +146,7 @@ def trainer(args):
             break
     # save images as video
     image_files = image_folder + '/*.png'
-    os.system('ffmpeg -pattern_type glob -r 1 -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + 'demo.mp4')
+    os.system('ffmpeg -pattern_type glob -r 1 -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + '/demo.mp4')
 
     env.close()
 
