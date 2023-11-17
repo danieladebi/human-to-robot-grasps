@@ -21,7 +21,9 @@ class VIPWrapper(GymWrapper, Env):
         AssertionError: [Object observations must be enabled if no keys]
     """
 
-    def __init__(self, env, vip_model, goal_image, keys=None):
+    def __init__(self, env, vip_model, goal_image, use_vip_embedding_obs=True,
+                 use_vip_reward=True, vip_reward_type='add', 
+                 vip_reward_interval=1, keys=None):
         self.vip_model = vip_model
         self.vip_model.to('cuda')
         self.vip_model.eval()
@@ -29,6 +31,11 @@ class VIPWrapper(GymWrapper, Env):
                         T.CenterCrop(224),
                         T.ToTensor()])
         self.goal_embedding = self.get_vip_embedding(goal_image)
+        self.use_vip_embedding_obs = use_vip_embedding_obs
+        self.use_vip_reward = use_vip_reward
+        self.vip_reward_type = vip_reward_type
+        self.vip_reward_interval = vip_reward_interval
+        self.curr_vip_reward_interval = 1
         
         # Run super method
         super().__init__(env=env)
@@ -38,6 +45,12 @@ class VIPWrapper(GymWrapper, Env):
 
         # Get reward range (MAY need to change this based upon VIP reward)
         self.reward_range = (0, self.env.reward_scale)
+        # vip reward is [-1, 1]
+        if use_vip_reward:
+            if vip_reward_type == 'add':
+                self.reward_range = (-1, self.env.reward_scale + 1)
+            else: # multiply
+                self.reward_range = (-self.env.reward_scale, self.env.reward_scale)
 
         embedding_keys = []
         if keys is None:
@@ -47,7 +60,11 @@ class VIPWrapper(GymWrapper, Env):
                 keys += ["object-state"]
             # Add image obs if requested
             if self.env.use_camera_obs:
-                embedding_keys += [f"{cam_name}_image" for cam_name in self.env.camera_names]
+                cam_data = [f"{cam_name}_image" for cam_name in self.env.camera_names]
+                if self.use_vip_embedding_obs:
+                    embedding_keys += cam_data
+                else:
+                    keys += cam_data
             # Iterate over all robots to add to state
             for idx in range(len(self.env.robots)):
                 keys += ["robot{}_proprio-state".format(idx)]
@@ -60,13 +77,21 @@ class VIPWrapper(GymWrapper, Env):
         # set up observation and action spaces
         obs = self.env.reset()
         self.modality_dims = {key: obs[key].shape for key in self.keys}
+        
         for key in embedding_keys:
             self.modality_dims[key] = 1024
             self.keys += [key]
         # let's modify the modality dims to be the VIP embedding size, which is 1024
         # check if VIP is on the GPU
         flat_ob = self._flatten_obs(obs)
-        flat_ob = self.add_embedding_flattened_obs(flat_ob, obs)
+        if self.use_vip_embedding_obs:
+            flat_ob = self.add_embedding_flattened_obs(flat_ob, obs)
+        # bound VIP reward
+        if self.use_vip_reward:
+            # initial distance from start -> goal
+            start_img = obs['agentview_image']
+            start_embedding = self.get_vip_embedding(start_img)
+            self.max_embedding_dist = np.linalg.norm(self.goal_embedding - start_embedding)
         self.obs_dim = flat_ob.size
         high = np.inf * np.ones(self.obs_dim)
         low = -high
@@ -122,7 +147,9 @@ class VIPWrapper(GymWrapper, Env):
             if 'image' in key:
                 embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
         flattened_obs = self._flatten_obs(ob_dict)
-        return self.add_embedding_flattened_obs(flattened_obs, ob_dict)
+        if self.use_vip_embedding_obs:
+            flattened_obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
+        return flattened_obs
 
     def step(self, action):
         """
@@ -140,18 +167,31 @@ class VIPWrapper(GymWrapper, Env):
                 - (dict) misc information
         """
         ob_dict, reward, done, info = self.env.step(action)
-        embedding_dict = {}
-        for key in ob_dict:
-            if 'image' in key:
-                embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
         flattened_obs = self._flatten_obs(ob_dict)
-        obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
-        # let's add l2 distance between current embedding and goal embedding as reward
-        cur_embedding = embedding_dict['agentview_image_embedding']
-        vip_reward = -np.linalg.norm(cur_embedding - self.goal_embedding)
-        # add it to current reward (now the reward is unbounded, not sure if it makes a huge difference?)
-        # maybe we can normalize the difference vector
-        reward += vip_reward
+                
+        use_vip_reward = self.use_vip_reward and (self.curr_vip_reward_interval == self.vip_reward_interval)
+        self.curr_vip_reward_interval = (self.curr_vip_reward_interval + 1) % self.vip_reward_interval
+        
+        if self.use_vip_embedding_obs or use_vip_reward:
+            embedding_dict = {}
+            for key in ob_dict:
+                if 'image' in key:
+                    embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
+        if self.use_vip_embedding_obs:
+            obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
+            
+        if self.use_vip_reward:
+            cur_embedding = embedding_dict['agentview_image_embedding']
+            vip_distance = np.linalg.norm(cur_embedding - self.goal_embedding)
+            # bound the reward
+            vip_distance = np.clip(vip_distance, 0, self.max_embedding_dist)
+            # range of vip_reward will be [-1, 1]
+            vip_reward = 1 - 2 * vip_distance / self.max_embedding_dist
+            if self.vip_reward_type == 'add':
+                reward += vip_reward
+            else:
+                reward *= vip_reward
+
         return obs, reward, done, info
 
     def seed(self, seed=None):
