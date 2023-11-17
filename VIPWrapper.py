@@ -84,7 +84,7 @@ class VIPWrapper(GymWrapper, Env):
         embedding = self.vip_model(img)
         embedding = embedding.cpu().detach().numpy()
         return embedding
-        
+
 
     def _flatten_obs(self, obs_dict, verbose=False):
         """
