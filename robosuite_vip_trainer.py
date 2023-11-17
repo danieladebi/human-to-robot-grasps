@@ -59,15 +59,15 @@ def trainer(args):
     #     use_image_obs=False,
     # )
             
-
-    # TODO: Write PPO algorithm to test
     vip_model = load_vip()
-    env = VIPWrapper(rs_env, vip_model, vip_goal)
-
-    # let's modify the environment to use VIP embedding as observation
-
-
-    # also, let's modify the environment to use VIP embedding distance to goal as a reward
+    env = VIPWrapper(rs_env, vip_model, vip_goal,
+                     use_vip_embedding_obs=args.use_vip_embedding_obs,
+                     use_hand_pose_obs=args.use_hand_pose_obs,
+                     use_vip_reward=args.use_vip_reward,
+                     vip_reward_type=args.vip_reward_type,
+                     vip_reward_min=args.vip_reward_min,
+                     vip_reward_max=args.vip_reward_max,
+                     vip_reward_interval=args.vip_reward_interval)
 
     def wrap_env(env):
         wrapped_env = Monitor(env) # needed for extracting eprewmean and eplenmean
@@ -77,12 +77,21 @@ def trainer(args):
         return wrapped_env
 
     wrap_env(env)
-    filename = task_name + '_test'
+    # get the number of folders in the trained_models directory
+    num_models = len(os.listdir('trained_models'))
+    base_folder = os.path.join('trained_models', task_name)
+    filepath = os.path.join(base_folder, str(num_models))
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./ppo_lift_tensorboard/")
-    model.learn(total_timesteps=2000, tb_log_name=filename) #  3e5, tb_log_name=filename)
+    model.learn(total_timesteps=2000, tb_log_name=filepath) #  3e5, tb_log_name=filename)
 
-    model.save('trained_models/' + filename)
+    model.save(filepath)
+    # let's also save the command line arguments as csv
+    args_filepath = filepath + '_args.csv'
+    with open(args_filepath, 'w') as f:
+        for arg in vars(args):
+            f.write("%s,%s\n"%(arg,getattr(args, arg)))
+    
     # env.save('trained_models/vec_normalize_' + filename + '.pkl') # Save VecNomralize statistics
 
     rs_test_env = robosuite.make(
@@ -102,9 +111,16 @@ def trainer(args):
             camera_widths=84,
             reward_shaping=True
         )
-    env_test = VIPWrapper(rs_test_env, vip_model, vip_goal)
+    env_test = VIPWrapper(rs_test_env, vip_model, vip_goal,
+                          use_vip_embedding_obs=args.use_vip_embedding_obs,
+                        use_hand_pose_obs=args.use_hand_pose_obs,
+                        use_vip_reward=False,
+                        vip_reward_type=args.vip_reward_type,
+                        vip_reward_min=args.vip_reward_min,
+                        vip_reward_max=args.vip_reward_max,
+                        vip_reward_interval=args.vip_reward_interval)
 
-    model = PPO.load("trained_models/" + filename)
+    model = PPO.load(filepath)
     env = DummyVecEnv([lambda : env_test])
     # env = VecNormalize.load("trained_models/vec_normalize_" + filename + ".pkl", env)
 
@@ -112,25 +128,25 @@ def trainer(args):
     env.norm_reward = False
 
     obs = env.reset()
-    image_folder = filename + '_images'
+    image_folder = os.path.join(filepath, 'images')
     os.makedirs(image_folder, exist_ok=True)
 
     i = 0
+    total_r = 0.0
     while True:
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
+        total_r += reward
         filepath = os.path.join(image_folder, 'img' + str(i) + '.png')
-        cv2.imwrite(filepath, env.latest_obs_dict['agent_image'])
+        cv2.imwrite(filepath, env.envs[0].gym_env.latest_obs_dict['agentview_image'])
         i += 1
 
         if done: 
             obs = env.reset()
             break
     # save images as video
-    # get success rate -- sparse rewards?
-
     image_files = image_folder + '/*.png'
-    os.system('ffmpeg -r 1 -i ' + image_files + ' -vcodec mpeg4 -y ' + filename + '_demo.mp4')
+    os.system('ffmpeg -pattern_type glob -r 1 -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + 'demo.mp4')
 
     env.close()
 

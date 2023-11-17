@@ -79,7 +79,7 @@ class VIPWrapper(GymWrapper, Env):
 
         # set up observation and action spaces
         obs = self.env.reset()
-        self.latest_ob_dict = obs
+        self.latest_obs_dict = obs
         self.modality_dims = {key: obs[key].shape for key in self.keys}
         
         for key in embedding_keys:
@@ -196,7 +196,7 @@ class VIPWrapper(GymWrapper, Env):
             else:
                 reward *= vip_reward
                 
-        self.latest_ob_dict = ob_dict
+        self.latest_obs_dict = ob_dict
         return obs, reward, done, info
 
     def seed(self, seed=None):
