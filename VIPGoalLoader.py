@@ -36,8 +36,8 @@ from collections import namedtuple
 class VIPGoalLoader:
     def __init__(self, task_name):
         self.download_folder = "robomimic_data/" + task_name + '/'
-        self.dataset_path = os.path.join(self.download_dataset, "demo_v141.hdf5")
-        self.processed_dataset_path = os.path.join(self.download_dataset, "image_dense_v141.hdf5")
+        self.dataset_path = os.path.join(self.download_folder, "demo_v141.hdf5")
+        self.processed_dataset_path = os.path.join(self.download_folder, "image_dense_v141.hdf5")
         self.task_name = task_name
     
     def get_data_loader(self, dataset_path):
@@ -49,7 +49,7 @@ class VIPGoalLoader:
         dataset = SequenceDataset(
             hdf5_path=dataset_path,
             obs_keys=(                      # observations we want to appear in batches
-                # "robot0_hand image (I forgot the name lol)",
+                # "robot0_hand image (I forgot the name lol), but there is another camera",
                 "agentview_image",
             ),
             dataset_keys=(                  # can optionally specify more keys here if they should appear in batches
@@ -83,17 +83,17 @@ class VIPGoalLoader:
         )
         return data_loader
     
-    def download_dataset(self, task_name):
+    def download_dataset(self):
         # set download folder and make it
-        os.makedirs(self.download_dataset, exist_ok=True)
+        os.makedirs(self.download_folder, exist_ok=True)
         if not os.path.exists(self.dataset_path):
             # download the dataset
-            task = task_name
+            task = self.task_name
             dataset_type = "ph"
             hdf5_type = "raw"
             FileUtils.download_url(
                 url=DATASET_REGISTRY[task][dataset_type][hdf5_type]["url"],
-                download_dir=self.download_dataset,
+                download_dir=self.download_folder,
             )
 
             # enforce that the dataset exists
@@ -120,8 +120,11 @@ class VIPGoalLoader:
             dataset_states_to_obs(args)
             assert os.path.exists(self.processed_dataset_path)
             
-    def load_dataset(self, task_name):
-        self.download_dataset(task_name)
-        dataset = self.get_data_loader(self.processed_dataset_path)
-        print('exploring dataset...')
-    
+    def load_dataset(self):
+        self.download_dataset()
+        self.dataset = self.get_data_loader(self.processed_dataset_path)
+        self.data_loader_iter = iter(self.dataset)
+        
+    def get_random_goal_image(self):
+        next_sample = next(self.data_loader_iter)
+        return next_sample['goal_obs']['agentview_image'][0].numpy()

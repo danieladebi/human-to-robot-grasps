@@ -36,8 +36,10 @@ rs_env = robosuite.make(
     reward_shaping=True
 )
 
-goal_dataset = VIPGoalLoader("lift")
-env_meta = FileUtils.get_env_metadata_from_dataset(goal_dataset.processed_dataset_path)
+vip_goal_loader = VIPGoalLoader("lift")
+vip_goal_loader.load_dataset()
+vip_goal = vip_goal_loader.get_random_goal_image()
+env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
 
 env = EnvUtils.create_env_from_metadata(
     env_meta=env_meta,
@@ -50,7 +52,7 @@ env = EnvUtils.create_env_from_metadata(
 
 # TODO: Write PPO algorithm to test
 vip_model = load_vip()
-env = VIPWrapper(rs_env, vip_model, None)
+env = VIPWrapper(rs_env, vip_model, vip_goal)
 
 # let's modify the environment to use VIP embedding as observation
 

@@ -28,6 +28,7 @@ class VIPWrapper(GymWrapper, Env):
         self.transform = T.Compose([T.Resize(256),
                         T.CenterCrop(224),
                         T.ToTensor()])
+        self.goal_embedding = self.get_vip_embedding(goal_image)
         
         # Run super method
         super().__init__(env=env)
@@ -145,6 +146,12 @@ class VIPWrapper(GymWrapper, Env):
                 embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
         flattened_obs = self._flatten_obs(ob_dict)
         obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
+        # let's add l2 distance between current embedding and goal embedding as reward
+        cur_embedding = embedding_dict['agentview_image_embedding']
+        vip_reward = -np.linalg.norm(cur_embedding - self.goal_embedding)
+        # add it to current reward (now the reward is unbounded, not sure if it makes a huge difference?)
+        # maybe we can normalize the difference vector
+        reward += vip_reward
         return obs, reward, done, info
 
     def seed(self, seed=None):
