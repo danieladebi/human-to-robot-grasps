@@ -19,6 +19,8 @@ from VIPGoalLoader import VIPGoalLoader
 from vip import load_vip
 import argparse
 
+from stable_baselines3.common.callbacks import ProgressBarCallback
+
 
 task_name_to_env_name_map = {"lift" : "Lift",
                              "door" : "Door",
@@ -79,17 +81,17 @@ def trainer(args):
         wrapped_env = Monitor(env) # needed for extracting eprewmean and eplenmean
         wrapped_env = DummyVecEnv([lambda: wrapped_env]) # Needed for all environments (e.g. used for multi-processing)
         # getting some gym box error when uncommenting below
-        # wrapped_env = VecNormalize(wrapped_env) # Needed for improving training when using MuJoCo envs?
+        wrapped_env = VecNormalize(wrapped_env) # Needed for improving training when using MuJoCo envs?
         return wrapped_env
 
-    wrap_env(env)
+    #wrap_env(env)
     # get the number of folders in the trained_models directory
     num_models = len(os.listdir('trained_models'))
     base_folder = os.path.join('trained_models', task_name)
     filepath = os.path.join(base_folder, str(num_models))
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/")
-    model.learn(total_timesteps=3e5, tb_log_name=filepath) #  3e5, tb_log_name=filename)
+    model.learn(total_timesteps=1e5, tb_log_name=filepath, progress_bar=True) #  3e5, tb_log_name=filename)
 
     model.save(filepath)
     # let's also save the command line arguments as csv
