@@ -19,11 +19,19 @@ from VIPGoalLoader import VIPGoalLoader
 from vip import load_vip
 import argparse
 
+
+task_name_to_env_name_map = {"lift" : "Lift",
+                             "door" : "Door",
+                             "nut" : "NutAssembly",
+                             "pick": "PickPlace",
+                             "stack": "Stack"}
+
+
 def trainer(args):
     controller_config = load_controller_config(default_controller="OSC_POSE")
 
     task_name = args.task
-    task_name_to_env_name = task_name[0].upper() + task_name[1:]
+    task_name_to_env_name = task_name_to_env_name_map[task_name] #task_name[0].upper() + task_name[1:]
     rs_env = robosuite.make(
         task_name_to_env_name,
         robots="Panda",
@@ -41,8 +49,6 @@ def trainer(args):
         camera_widths=84,
         reward_shaping=True
     )
-
-    task_name = "lift"
 
     vip_goal_loader = VIPGoalLoader(task_name)
     vip_goal_loader.load_dataset()
@@ -82,8 +88,8 @@ def trainer(args):
     base_folder = os.path.join('trained_models', task_name)
     filepath = os.path.join(base_folder, str(num_models))
 
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log="./ppo_lift_tensorboard/")
-    model.learn(total_timesteps=2000, tb_log_name=filepath) #  3e5, tb_log_name=filename)
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/")
+    model.learn(total_timesteps=3e5, tb_log_name=filepath) #  3e5, tb_log_name=filename)
 
     model.save(filepath)
     # let's also save the command line arguments as csv
@@ -95,7 +101,7 @@ def trainer(args):
     # env.save('trained_models/vec_normalize_' + filename + '.pkl') # Save VecNomralize statistics
 
     rs_test_env = robosuite.make(
-            "Lift",
+            task_name_to_env_name,
             robots="Panda",
             gripper_types="default",
             controller_configs=controller_config,
