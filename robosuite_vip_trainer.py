@@ -68,7 +68,7 @@ def trainer(args):
     # )
             
     vip_model = load_vip()
-    vip.eval()
+    vip_model.eval()
     env = VIPWrapper(rs_env, vip_model, vip_goal,
                      use_vip_embedding_obs=args.use_vip_embedding_obs,
                      use_hand_pose_obs=args.use_hand_pose_obs,
