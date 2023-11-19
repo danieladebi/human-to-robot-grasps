@@ -8,7 +8,7 @@ import cv2
 
 from robosuite.environments.base import register_env
 
-from stable_baselines3 import PPO 
+from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.save_util import save_to_zip_file, load_from_zip_file
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
@@ -68,6 +68,7 @@ def trainer(args):
     # )
             
     vip_model = load_vip()
+    vip.eval()
     env = VIPWrapper(rs_env, vip_model, vip_goal,
                      use_vip_embedding_obs=args.use_vip_embedding_obs,
                      use_hand_pose_obs=args.use_hand_pose_obs,
@@ -90,8 +91,8 @@ def trainer(args):
     base_folder = os.path.join('trained_models', task_name)
     filepath = os.path.join(base_folder, str(num_models))
 
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/")
-    model.learn(total_timesteps=1e5, tb_log_name=filepath, progress_bar=True) #  3e5, tb_log_name=filename)
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/") # PPO
+    model.learn(total_timesteps=3e5, tb_log_name=filepath, progress_bar=True) #  3e5, tb_log_name=filename)
 
     model.save(filepath)
     # let's also save the command line arguments as csv
