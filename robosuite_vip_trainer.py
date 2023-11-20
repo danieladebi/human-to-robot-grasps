@@ -98,13 +98,16 @@ def trainer(args):
 
     #wrap_env(env)
     # get the number of folders in the trained_models directory
-    num_models = len(os.listdir('trained_models'))
     base_folder = os.path.join('trained_models', task_name)
+    children_files = os.listdir(base_folder)
+    children_folders = [f for f in children_files if os.path.isdir(os.path.join(base_folder, f))]
+    num_models = len(children_folders)
+    
     model_folder = os.path.join(base_folder, str(num_models + 1))
     model_filepath = os.path.join(model_folder, 'model')
-    
 
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/") # PPO
+
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard") # PPO
     model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
 
     model.save(model_filepath)
@@ -145,13 +148,17 @@ def trainer(args):
     assert not os.path.exists(image_folder)
     os.makedirs(image_folder, exist_ok=True)
 
-    horizon = env_meta['env_kwargs']['horizon']
+    horizon = rs_test_env.horizon
+    # get number of digits
+    num_digits = len(str(horizon))
+    # files should go from 0001.png to horizon.png
     total_r = 0.0
     for i in tqdm.tqdm(range(horizon)):
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
         total_r += reward
-        image_filepath = os.path.join(image_folder, 'img' + str(i) + '.png')
+        file_idx = str(i).zfill(num_digits)
+        image_filepath = os.path.join(image_folder, 'img_' + file_idx + '.png')
         img = env.envs[0].gym_env.latest_obs_dict['agentview_image']
         img[:, :, [0, 2]] = img[:, :, [2, 0]] # swap blues and reds
         cv2.imwrite(image_filepath, img)
@@ -160,9 +167,9 @@ def trainer(args):
             obs = env.reset()
             break
     # save images as video
-    image_files = image_folder + '/*.png'
+    image_files = image_folder + f'/img_%0{num_digits}d.png'
     control_freq = 20 # equivalent to fps
-    os.system('ffmpeg -pattern_type glob -r ' + str(control_freq) + ' -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + model_folder + '/demo.mp4')
+    os.system('ffmpeg -r ' + str(control_freq) + ' -i ' + image_files + ' -vcodec mpeg4 -y ' + model_folder + '/demo.mp4')
 
     env.close()
 
