@@ -129,6 +129,8 @@ class VIPGoalLoader:
     def get_random_goal_image(self):
         next_sample = next(self.data_loader_iter)
         img = next_sample['goal_obs']['agentview_image'][0].numpy()
+        # image should be upside down
+        img = np.flipud(img)
         # save img to debug
         rgb_img = np.copy(img)
         # swap blues and reds
