@@ -99,7 +99,7 @@ def trainer(args):
     filepath = os.path.join(base_folder, str(num_models))
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/") # PPO
-    model.learn(total_timesteps=3e5, tb_log_name=filepath, progress_bar=True) #  3e5, tb_log_name=filename)
+    model.learn(total_timesteps=args.n_steps, tb_log_name=filepath, progress_bar=True)
 
     model.save(filepath)
     # let's also save the command line arguments as csv
@@ -110,23 +110,14 @@ def trainer(args):
     
     # env.save('trained_models/vec_normalize_' + filename + '.pkl') # Save VecNomralize statistics
 
-    rs_test_env = robosuite.make(
-            task_name_to_env_name,
-            robots="Panda",
-            gripper_types="default",
-            controller_configs=controller_config,
-            has_renderer=False,
-            render_camera="frontview",
-            has_offscreen_renderer=True,
-            control_freq=20,
-            horizon=2000,
-            use_object_obs=False,
-            use_camera_obs=True,
-            camera_names="agentview",
-            camera_heights=84,
-            camera_widths=84,
-            reward_shaping=True
-        )
+    rs_test_env = EnvUtils.create_env_from_metadata(
+        env_meta=env_meta,
+        env_name=env_meta["env_name"],
+        render=False,
+        render_offscreen=True,
+        use_image_obs=True,
+    )
+    rs_env = rs_env.env
     env_test = VIPWrapper(rs_test_env, vip_model, vip_goal,
                           use_vip_embedding_obs=args.use_vip_embedding_obs,
                         use_hand_pose_obs=args.use_hand_pose_obs,
@@ -162,7 +153,7 @@ def trainer(args):
             break
     # save images as video
     image_files = image_folder + '/*.png'
-    frame_rate = 30 
+    frame_rate = 30
     os.system('ffmpeg -pattern_type glob -r ' + str(frame_rate) + ' -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + '/demo.mp4')
 
     env.close()
@@ -171,6 +162,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--task', type=str, default='lift')
     parser.add_argument('--seed', type=int, default=0)
+    parser.add_argument('--n_steps', type=int, default=3e5)
     
     # vip arguments
     parser.add_argument('--use_vip_embedding_obs', type=bool, default=True)
