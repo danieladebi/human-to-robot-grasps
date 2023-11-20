@@ -22,11 +22,17 @@ import argparse
 from stable_baselines3.common.callbacks import ProgressBarCallback
 
 
+# task_name_to_env_name_map = {"lift" : "Lift",
+#                              "door" : "Door",
+#                              "nut" : "NutAssembly",
+#                              "pick": "PickPlace",
+#                              "stack": "Stack"}
+
 task_name_to_env_name_map = {"lift" : "Lift",
-                             "door" : "Door",
-                             "nut" : "NutAssembly",
-                             "pick": "PickPlace",
-                             "stack": "Stack"}
+                             "can" : "Can",
+                             "square" : "Square",
+                             "transport": "Transport",
+                             "tool_hang": "Tool_Hang"}
 
 
 def trainer(args):
@@ -34,38 +40,39 @@ def trainer(args):
 
     task_name = args.task
     task_name_to_env_name = task_name_to_env_name_map[task_name] #task_name[0].upper() + task_name[1:]
-    rs_env = robosuite.make(
-        task_name_to_env_name,
-        robots="Panda",
-        gripper_types="default",
-        controller_configs=controller_config,
-        has_renderer=False,
-        render_camera="frontview",
-        has_offscreen_renderer=True,
-        control_freq=20,
-        horizon=2000,
-        use_object_obs=False,
-        use_camera_obs=True,
-        camera_names="agentview",
-        camera_heights=84,
-        camera_widths=84,
-        reward_shaping=True
-    )
+    # rs_env = robosuite.make(
+    #     task_name_to_env_name,
+    #     robots="Panda",
+    #     gripper_types="default",
+    #     controller_configs=controller_config,
+    #     has_renderer=False,
+    #     render_camera="frontview",
+    #     has_offscreen_renderer=True,
+    #     control_freq=20,
+    #     horizon=2000,
+    #     use_object_obs=False,
+    #     use_camera_obs=True,
+    #     camera_names="agentview",
+    #     camera_heights=84,
+    #     camera_widths=84,
+    #     reward_shaping=True
+    # )
 
     vip_goal_loader = VIPGoalLoader(task_name)
     vip_goal_loader.load_dataset()
     vip_goal = vip_goal_loader.get_random_goal_image()
 
     # Might be useful later
-    # env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
+    env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
 
-    # env = EnvUtils.create_env_from_metadata(
-    #     env_meta=env_meta,
-    #     env_name=env_meta["env_name"],
-    #     render=False,
-    #     render_offscreen=True,
-    #     use_image_obs=False,
-    # )
+    rs_env = EnvUtils.create_env_from_metadata(
+        env_meta=env_meta,
+        env_name=env_meta["env_name"],
+        render=False,
+        render_offscreen=True,
+        use_image_obs=True,
+    )
+    rs_env = rs_env.env
             
     vip_model = load_vip()
     vip_model.eval()
@@ -155,7 +162,8 @@ def trainer(args):
             break
     # save images as video
     image_files = image_folder + '/*.png'
-    os.system('ffmpeg -pattern_type glob -r 1 -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + '/demo.mp4')
+    frame_rate = 30 
+    os.system('ffmpeg -pattern_type glob -r ' + str(frame_rate) + ' -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + '/demo.mp4')
 
     env.close()
 
