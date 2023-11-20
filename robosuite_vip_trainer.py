@@ -57,6 +57,26 @@ def trainer(args):
     #     camera_widths=84,
     #     reward_shaping=True
     # )
+    
+    # dict = {'has_renderer': False, 
+    # 'has_offscreen_renderer': True, 
+    # 'ignore_done': True, 
+    # 'use_object_obs': True, 
+    # 'use_camera_obs': True, 
+    # 'control_freq': 20, 
+    # 'controller_configs': 
+    #     {'type': 'OSC_POSE', 'input_max': 1, 'input_min': -1, 'output_max': [0.05, 0.05, 0.05, 0.5, 0.5, 0.5], 
+    #      'output_min': [-0.05, -0.05, -0.05, -0.5, -0.5, -0.5], 
+    #      'kp': 150, 'damping': 1, 'impedance_mode': 'fixed', 
+    #      'kp_limits': [0, 300], 'damping_limits': [0, 10], 
+    #      'position_limits': None, 'orientation_limits': None, 
+    #      'uncouple_pos_ori': True, 'control_delta': True, 
+    #      'interpolation': None, 'ramp_ratio': 0.2}, 
+    # 'robots': ['Panda'], 
+    # 'camera_depths': False, 
+    # 'camera_heights': 84, 'camera_widths': 84, 
+    # 'reward_shaping': True, 
+    # 'camera_names': ['agentview', 'robot0_eye_in_hand'], 'render_gpu_device_id': 0}
 
     vip_goal_loader = VIPGoalLoader(task_name)
     vip_goal_loader.load_dataset()
@@ -64,6 +84,9 @@ def trainer(args):
 
     # Might be useful later
     env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
+    env_meta['env_kwargs']['horizon'] = 2000
+    env_meta['env_kwargs']['use_object_obs'] = False
+    env_meta['env_kwargs']['camera_names'] = 'agentview'
 
     rs_env = EnvUtils.create_env_from_metadata(
         env_meta=env_meta,
@@ -96,14 +119,16 @@ def trainer(args):
     # get the number of folders in the trained_models directory
     num_models = len(os.listdir('trained_models'))
     base_folder = os.path.join('trained_models', task_name)
-    filepath = os.path.join(base_folder, str(num_models))
+    model_folder = os.path.join(base_folder, str(num_models))
+    model_filepath = os.path.join(model_folder, 'model')
+    
 
     model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"./ppo_{task_name}_tensorboard/") # PPO
-    model.learn(total_timesteps=args.n_steps, tb_log_name=filepath, progress_bar=True)
+    model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
 
-    model.save(filepath)
+    model.save(model_filepath)
     # let's also save the command line arguments as csv
-    args_filepath = filepath + '_args.csv'
+    args_filepath = os.path.join(model_folder, 'args.csv')
     with open(args_filepath, 'w') as f:
         for arg in vars(args):
             f.write("%s,%s\n"%(arg,getattr(args, arg)))
@@ -117,7 +142,7 @@ def trainer(args):
         render_offscreen=True,
         use_image_obs=True,
     )
-    rs_env = rs_env.env
+    rs_test_env = rs_test_env.env
     env_test = VIPWrapper(rs_test_env, vip_model, vip_goal,
                           use_vip_embedding_obs=args.use_vip_embedding_obs,
                         use_hand_pose_obs=args.use_hand_pose_obs,
@@ -127,7 +152,7 @@ def trainer(args):
                         vip_reward_max=args.vip_reward_max,
                         vip_reward_interval=args.vip_reward_interval)
 
-    model = PPO.load(filepath)
+    model = PPO.load(model_filepath)
     env = DummyVecEnv([lambda : env_test])
     # env = VecNormalize.load("trained_models/vec_normalize_" + filename + ".pkl", env)
 
@@ -135,7 +160,7 @@ def trainer(args):
     env.norm_reward = False
 
     obs = env.reset()
-    image_folder = os.path.join(filepath, 'images')
+    image_folder = os.path.join(model_folder, 'images')
     os.makedirs(image_folder, exist_ok=True)
 
     i = 0
