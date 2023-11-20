@@ -3,6 +3,7 @@ import robosuite
 from robosuite.controllers import load_controller_config
 
 import numpy as np
+import tqdm
 import os
 import cv2
 
@@ -57,26 +58,6 @@ def trainer(args):
     #     camera_widths=84,
     #     reward_shaping=True
     # )
-    
-    # dict = {'has_renderer': False, 
-    # 'has_offscreen_renderer': True, 
-    # 'ignore_done': True, 
-    # 'use_object_obs': True, 
-    # 'use_camera_obs': True, 
-    # 'control_freq': 20, 
-    # 'controller_configs': 
-    #     {'type': 'OSC_POSE', 'input_max': 1, 'input_min': -1, 'output_max': [0.05, 0.05, 0.05, 0.5, 0.5, 0.5], 
-    #      'output_min': [-0.05, -0.05, -0.05, -0.5, -0.5, -0.5], 
-    #      'kp': 150, 'damping': 1, 'impedance_mode': 'fixed', 
-    #      'kp_limits': [0, 300], 'damping_limits': [0, 10], 
-    #      'position_limits': None, 'orientation_limits': None, 
-    #      'uncouple_pos_ori': True, 'control_delta': True, 
-    #      'interpolation': None, 'ramp_ratio': 0.2}, 
-    # 'robots': ['Panda'], 
-    # 'camera_depths': False, 
-    # 'camera_heights': 84, 'camera_widths': 84, 
-    # 'reward_shaping': True, 
-    # 'camera_names': ['agentview', 'robot0_eye_in_hand'], 'render_gpu_device_id': 0}
 
     vip_goal_loader = VIPGoalLoader(task_name)
     vip_goal_loader.load_dataset()
@@ -84,6 +65,7 @@ def trainer(args):
 
     # Might be useful later
     env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
+    # env_meta['env_kwargs']['horizon'] = 200 # for debugging
     env_meta['env_kwargs']['use_object_obs'] = False
     env_meta['env_kwargs']['camera_names'] = 'agentview'
 
@@ -118,7 +100,7 @@ def trainer(args):
     # get the number of folders in the trained_models directory
     num_models = len(os.listdir('trained_models'))
     base_folder = os.path.join('trained_models', task_name)
-    model_folder = os.path.join(base_folder, str(num_models))
+    model_folder = os.path.join(base_folder, str(num_models + 1))
     model_filepath = os.path.join(model_folder, 'model')
     
 
@@ -160,25 +142,27 @@ def trainer(args):
 
     obs = env.reset()
     image_folder = os.path.join(model_folder, 'images')
+    assert not os.path.exists(image_folder)
     os.makedirs(image_folder, exist_ok=True)
 
-    i = 0
+    horizon = env_meta['env_kwargs']['horizon']
     total_r = 0.0
-    while True:
+    for i in tqdm.tqdm(range(horizon)):
         action, _ = model.predict(obs, deterministic=True)
         obs, reward, done, info = env.step(action)
         total_r += reward
         image_filepath = os.path.join(image_folder, 'img' + str(i) + '.png')
-        cv2.imwrite(image_filepath, env.envs[0].gym_env.latest_obs_dict['agentview_image'])
-        i += 1
+        img = env.envs[0].gym_env.latest_obs_dict['agentview_image']
+        img[:, :, [0, 2]] = img[:, :, [2, 0]] # swap blues and reds
+        cv2.imwrite(image_filepath, img)
 
         if done: 
             obs = env.reset()
             break
     # save images as video
     image_files = image_folder + '/*.png'
-    frame_rate = 30
-    os.system('ffmpeg -pattern_type glob -r ' + str(frame_rate) + ' -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + filepath + '/demo.mp4')
+    control_freq = 20 # equivalent to fps
+    os.system('ffmpeg -pattern_type glob -r ' + str(control_freq) + ' -i ' + '\'' + image_files + '\'' + ' -vcodec mpeg4 -y ' + model_folder + '/demo.mp4')
 
     env.close()
 

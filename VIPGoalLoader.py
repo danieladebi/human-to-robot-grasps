@@ -2,6 +2,7 @@ import os
 import json
 import h5py
 import numpy as np
+import cv2
 
 import robomimic
 import robomimic.utils.file_utils as FileUtils
@@ -127,4 +128,11 @@ class VIPGoalLoader:
         
     def get_random_goal_image(self):
         next_sample = next(self.data_loader_iter)
-        return next_sample['goal_obs']['agentview_image'][0].numpy()
+        img = next_sample['goal_obs']['agentview_image'][0].numpy()
+        # save img to debug
+        rgb_img = np.copy(img)
+        # swap blues and reds
+        rgb_img[:, :, [0, 2]] = rgb_img[:, :, [2, 0]]
+        goal_filepath = f'goal_{self.task_name}.png'
+        cv2.imwrite(goal_filepath, rgb_img)
+        return img
