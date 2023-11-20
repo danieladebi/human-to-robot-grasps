@@ -84,7 +84,6 @@ def trainer(args):
 
     # Might be useful later
     env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
-    env_meta['env_kwargs']['horizon'] = 2000
     env_meta['env_kwargs']['use_object_obs'] = False
     env_meta['env_kwargs']['camera_names'] = 'agentview'
 
