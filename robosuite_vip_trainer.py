@@ -104,6 +104,8 @@ def trainer(args):
     num_models = len(children_folders)
     
     model_folder = os.path.join(base_folder, str(num_models + 1))
+    # make model folder
+    os.makedirs(model_folder, exist_ok=True)
     model_filepath = os.path.join(model_folder, 'model')
 
 
