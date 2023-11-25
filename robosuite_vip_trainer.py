@@ -93,10 +93,10 @@ def trainer(args):
         wrapped_env = Monitor(env) # needed for extracting eprewmean and eplenmean
         wrapped_env = DummyVecEnv([lambda: wrapped_env]) # Needed for all environments (e.g. used for multi-processing)
         # getting some gym box error when uncommenting below
-        wrapped_env = VecNormalize(wrapped_env) # Needed for improving training when using MuJoCo envs?
+        # wrapped_env = VecNormalize(wrapped_env) # Needed for improving training when using MuJoCo envs?
         return wrapped_env
 
-    #wrap_env(env)
+    env = wrap_env(env)
     # get the number of folders in the trained_models directory
     base_folder = os.path.join('trained_models', task_name)
     children_files = os.listdir(base_folder)
@@ -108,16 +108,16 @@ def trainer(args):
     os.makedirs(model_folder, exist_ok=True)
     model_filepath = os.path.join(model_folder, 'model')
 
-
-    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard") # PPO
-    model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
-
-    model.save(model_filepath)
     # let's also save the command line arguments as csv
     args_filepath = os.path.join(model_folder, 'args.csv')
     with open(args_filepath, 'w') as f:
         for arg in vars(args):
             f.write("%s,%s\n"%(arg,getattr(args, arg)))
+     
+    model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard") # PPO
+    model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
+
+    model.save(model_filepath)
     
     # env.save('trained_models/vec_normalize_' + filename + '.pkl') # Save VecNomralize statistics
 
@@ -182,9 +182,9 @@ if __name__ == '__main__':
     parser.add_argument('--n_steps', type=int, default=3e5)
     
     # vip arguments
-    parser.add_argument('--use_vip_embedding_obs', type=bool, default=True)
-    parser.add_argument('--use_hand_pose_obs', type=bool, default=True)
-    parser.add_argument('--use_vip_reward', type=bool, default=True)
+    parser.add_argument('--use_vip_embedding_obs', action='store_true', default=False)
+    parser.add_argument('--use_hand_pose_obs', action='store_true', default=False)
+    parser.add_argument('--use_vip_reward', action='store_true', default=False)
     parser.add_argument('--vip_reward_type', type=str, default='add')
     parser.add_argument('--vip_reward_min', type=float, default=-1)
     parser.add_argument('--vip_reward_max', type=float, default=1)

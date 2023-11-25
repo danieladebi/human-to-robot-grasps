@@ -1,7 +1,7 @@
 from robosuite.wrappers import GymWrapper
 from gym.core import Env
 import numpy as np
-from gym import spaces
+from gymnasium import spaces
 import torchvision.transforms as T
 from PIL import Image
 import cv2
@@ -206,6 +206,7 @@ class VIPWrapper(GymWrapper, Env):
             for key in ob_dict:
                 if 'image' in key:
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
+        obs = flattened_obs
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
             obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
             
