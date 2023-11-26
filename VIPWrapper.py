@@ -96,7 +96,6 @@ class VIPWrapper(GymWrapper, Env):
         
         for key in embedding_keys:
             self.modality_dims[key] = 1024
-            self.keys += [key]
         if self.use_hand_pose_obs:
             self.modality_dims['hand_pose'] = 21 * 3
         # let's modify the modality dims to be the VIP embedding size, which is 1024
@@ -105,7 +104,6 @@ class VIPWrapper(GymWrapper, Env):
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
             embedding_dict = {}
             if self.use_vip_embedding_obs:
-                
                 for key in obs:
                     if 'image' in key:
                         embedding_dict[key + '_embedding'] = self.get_vip_embedding(obs[key])
@@ -227,10 +225,11 @@ class VIPWrapper(GymWrapper, Env):
                 - (dict) misc information
         """
         ob_dict, reward, done, info = self.env.step(action)
+        self.latest_obs_dict = ob_dict
         flattened_obs = self._flatten_obs(ob_dict)
                 
         use_vip_reward = self.use_vip_reward and (self.curr_vip_reward_interval == self.vip_reward_interval)
-        self.curr_vip_reward_interval = (self.curr_vip_reward_interval + 1) % self.vip_reward_interval
+        self.curr_vip_reward_interval = (self.curr_vip_reward_interval + 1) % self.vip_reward_interval + 1
         embedding_dict = {}
 
         for key in ob_dict:
@@ -241,7 +240,7 @@ class VIPWrapper(GymWrapper, Env):
                     embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
                 if self.use_hand_pose_obs and 'image' in key:
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
-                    
+    
         obs = flattened_obs
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
             obs = self.add_embedding_flattened_obs(flattened_obs, embedding_dict)
@@ -261,7 +260,6 @@ class VIPWrapper(GymWrapper, Env):
             else:
                 reward *= vip_reward
 
-        self.latest_obs_dict = ob_dict
         return obs, reward, done, info
 
     def seed(self, seed=None):
