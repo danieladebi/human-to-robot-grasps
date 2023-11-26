@@ -1,7 +1,7 @@
 from robosuite.wrappers import GymWrapper
 from gym.core import Env
 import numpy as np
-from gymnasium import spaces
+from gym import spaces
 import torchvision.transforms as T
 from PIL import Image
 import cv2
@@ -30,7 +30,7 @@ class VIPWrapper(GymWrapper, Env):
                  vip_reward_min=-1, vip_reward_max=1,
                  vip_reward_interval=1, keys=None):
         self.vip_model = vip_model
-        self.vip_model.to('cuda')
+        self.vip_model = self.vip_model.to('cuda')
         self.vip_model.eval()
         self.transform = T.Compose([T.Resize(256),
                         T.CenterCrop(224),
@@ -61,6 +61,8 @@ class VIPWrapper(GymWrapper, Env):
         if self.use_hand_pose_obs is True:
             model_filepath = 'hand_pose_model/best_model'
             self.hand_pose_model = hand_pose_model.load_from_file(model_filepath)
+            self.hand_pose_model = self.hand_pose_model.to('cuda')
+            self.hand_pose_model.eval()
 
         embedding_keys = []
         if keys is None:
@@ -96,14 +98,27 @@ class VIPWrapper(GymWrapper, Env):
             self.modality_dims['hand_pose'] = 21 * 3
         # let's modify the modality dims to be the VIP embedding size, which is 1024
         # check if VIP is on the GPU
+        embedding_dict = {}
+        if self.use_vip_embedding_obs or self.use_hand_pose_obs:
+            embedding_dict = {}
+            if self.use_vip_embedding_obs:
+                
+                for key in obs:
+                    if 'image' in key:
+                        embedding_dict[key + '_embedding'] = self.get_vip_embedding(obs[key])
+            if self.use_hand_pose_obs:
+                for key in obs:
+                    if 'image' in key:
+                        embedding_dict[key + '_hand_pose'] = self.get_hand_pose(obs[key])
+        start_img = obs['agentview_image']
+        if self.use_vip_embedding_obs:
+            del obs['agentview_image']
         flat_ob = self._flatten_obs(obs)
-        if self.use_vip_embedding_obs or self.use_hand_pose_obs: 
-            flat_ob = self.add_embedding_flattened_obs(flat_ob, obs)
-            
+        flat_ob = self.add_embedding_flattened_obs(flat_ob, embedding_dict)
+
         # bound VIP reward
         if self.use_vip_reward:
             # initial distance from start -> goal
-            start_img = obs['agentview_image']
             start_embedding = self.get_vip_embedding(start_img)
             self.max_embedding_dist = np.linalg.norm(self.goal_embedding - start_embedding)
         self.obs_dim = flat_ob.size
@@ -119,7 +134,7 @@ class VIPWrapper(GymWrapper, Env):
         img = Image.fromarray(img.astype(np.uint8))
         img = self.transform(img)  * 255
         img = img.unsqueeze(0)
-        img.cuda()
+        img = img.to('cuda')
         embedding = self.vip_model(img)
         embedding = embedding.cpu().detach().numpy()
         return embedding
@@ -128,10 +143,10 @@ class VIPWrapper(GymWrapper, Env):
         img = Image.fromarray(img.astype(np.uint8))
         img = self.transform(img)  * 255
         img = img.unsqueeze(0)
-        img.cuda()
-        pred_hp = self.hand_pose_model(img).reshape(-1, 21, 3)
+        img = img.to('cuda')
+        pred_hp = self.hand_pose_model(img)
         pred_hp = pred_hp.cpu().detach().numpy()
-        return pred_hp.flatten()
+        return pred_hp
 
 
     def _flatten_obs(self, obs_dict, verbose=False):
@@ -170,10 +185,10 @@ class VIPWrapper(GymWrapper, Env):
             if self.use_vip_embedding_obs and 'image' in key:
                 embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
             if self.use_hand_pose_obs and 'image' in key:
-                embedding_dict['hand_pose'] = self.get_hand_pose(ob_dict[key])
+                embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
         flattened_obs = self._flatten_obs(ob_dict)
-        if self.use_vip_embedding_obs:
-            flattened_obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
+        if self.use_vip_embedding_obs or self.use_hand_pose_obs:
+            flattened_obs = self.add_embedding_flattened_obs(flattened_obs, embedding_dict)
         return flattened_obs
 
     def step(self, action):
@@ -208,7 +223,7 @@ class VIPWrapper(GymWrapper, Env):
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
         obs = flattened_obs
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
-            obs = self.add_embedding_flattened_obs(flattened_obs, ob_dict)
+            obs = self.add_embedding_flattened_obs(flattened_obs, embedding_dict)
             
         if self.use_vip_reward:
             cur_embedding = embedding_dict['agentview_image_embedding']

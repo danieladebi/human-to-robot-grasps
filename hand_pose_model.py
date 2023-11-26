@@ -17,7 +17,7 @@ def load_from_file(filepath):
 
 class HandPoseModel(nn.Module):
     def __init__(self):
-        super(HandPoseModel, self).__init__()        
+        super(HandPoseModel, self).__init__()
         self.base_model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
         self.base_model.fc = nn.Linear(2048, 21*3)
         

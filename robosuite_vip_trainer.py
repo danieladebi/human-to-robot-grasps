@@ -96,7 +96,7 @@ def trainer(args):
         # wrapped_env = VecNormalize(wrapped_env) # Needed for improving training when using MuJoCo envs?
         return wrapped_env
 
-    env = wrap_env(env)
+    # env = wrap_env(env)
     # get the number of folders in the trained_models directory
     base_folder = os.path.join('trained_models', task_name)
     children_files = os.listdir(base_folder)
