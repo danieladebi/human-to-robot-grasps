@@ -41,6 +41,9 @@ class VIPWrapper(GymWrapper, Env):
         self.use_vip_reward = use_vip_reward
         self.vip_reward_type = vip_reward_type
         self.vip_reward_interval = vip_reward_interval
+        self.vip_reward_min = vip_reward_min
+        self.vip_reward_max = vip_reward_max
+        self.reward_span = vip_reward_max - vip_reward_min
         self.curr_vip_reward_interval = 1
         
         # Run super method
@@ -147,6 +150,20 @@ class VIPWrapper(GymWrapper, Env):
         pred_hp = self.hand_pose_model(img)
         pred_hp = pred_hp.cpu().detach().numpy()
         return pred_hp
+    
+    def get_both_embeddings(self, img):
+        img = Image.fromarray(img.astype(np.uint8))
+        img = self.transform(img)  * 255
+        img = img.unsqueeze(0)
+        img = img.to('cuda')
+        
+        pred_hp = self.hand_pose_model(img)
+        pred_hp = pred_hp.cpu().detach().numpy()
+        
+        embedding = self.vip_model(img)
+        embedding = embedding.cpu().detach().numpy()
+        
+        return embedding, pred_hp
 
 
     def _flatten_obs(self, obs_dict, verbose=False):
@@ -182,10 +199,13 @@ class VIPWrapper(GymWrapper, Env):
         ob_dict = self.env.reset()
         embedding_dict = {}
         for key in ob_dict:
-            if self.use_vip_embedding_obs and 'image' in key:
-                embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
-            if self.use_hand_pose_obs and 'image' in key:
-                embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
+            if self.use_vip_embedding_obs and self.use_hand_pose_obs and 'image' in key:
+                embedding_dict[key + '_embedding'], embedding_dict[key + '_hand_pose'] = self.get_both_embeddings(ob_dict[key])
+            else:
+                if self.use_vip_embedding_obs and 'image' in key:
+                    embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
+                if self.use_hand_pose_obs and 'image' in key:
+                    embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
         flattened_obs = self._flatten_obs(ob_dict)
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
             flattened_obs = self.add_embedding_flattened_obs(flattened_obs, embedding_dict)
@@ -212,31 +232,35 @@ class VIPWrapper(GymWrapper, Env):
         use_vip_reward = self.use_vip_reward and (self.curr_vip_reward_interval == self.vip_reward_interval)
         self.curr_vip_reward_interval = (self.curr_vip_reward_interval + 1) % self.vip_reward_interval
         embedding_dict = {}
-        
-        if self.use_vip_embedding_obs or use_vip_reward:
-            for key in ob_dict:
-                if 'image' in key:
+
+        for key in ob_dict:
+            if (self.use_vip_embedding_obs or use_vip_reward) and self.use_hand_pose_obs and 'image' in key:
+                embedding_dict[key + '_embedding'], embedding_dict[key + '_hand_pose'] = self.get_both_embeddings(ob_dict[key])
+            else:
+                if (self.use_vip_embedding_obs or use_vip_reward) and 'image' in key:
                     embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
-        if self.use_hand_pose_obs:
-            for key in ob_dict:
-                if 'image' in key:
+                if self.use_hand_pose_obs and 'image' in key:
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
+                    
         obs = flattened_obs
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
             obs = self.add_embedding_flattened_obs(flattened_obs, embedding_dict)
             
-        if self.use_vip_reward:
+        if use_vip_reward:
             cur_embedding = embedding_dict['agentview_image_embedding']
             vip_distance = np.linalg.norm(cur_embedding - self.goal_embedding)
             # bound the reward
             vip_distance = np.clip(vip_distance, 0, self.max_embedding_dist)
+            normalized_vip_distance = vip_distance / self.max_embedding_dist
+            # let's flip so lower is worse
+            normalized_vip_distance = 1 - normalized_vip_distance
             # range of vip_reward will be [-1, 1]
-            vip_reward = 1 - 2 * vip_distance / self.max_embedding_dist
+            vip_reward = self.reward_span * normalized_vip_distance + self.vip_reward_min
             if self.vip_reward_type == 'add':
                 reward += vip_reward
             else:
                 reward *= vip_reward
-                
+
         self.latest_obs_dict = ob_dict
         return obs, reward, done, info
 
