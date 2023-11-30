@@ -124,7 +124,7 @@ def trainer(args):
 
     num_envs = 1
     env = CustomDummyVecEnv([make_env(i) for i in range(num_envs)])
-    env = VecNormalize(env, norm_obs=True, norm_reward=False)
+    env = VecNormalize(env, norm_obs=True, norm_reward=True)
     # get the number of folders in the trained_models directory
     base_folder = os.path.join('trained_models', task_name)
     children_files = os.listdir(base_folder)
@@ -159,14 +159,14 @@ def trainer(args):
     env_test = VIPWrapper(rs_test_env, vip_model, vip_goal,
                           use_vip_embedding_obs=args.use_vip_embedding_obs,
                         use_hand_pose_obs=args.use_hand_pose_obs,
-                        use_vip_reward=False,
+                        use_vip_reward=args.use_vip_reward,
                         vip_reward_type=args.vip_reward_type,
                         vip_reward_min=args.vip_reward_min,
                         vip_reward_max=args.vip_reward_max,
                         vip_reward_interval=args.vip_reward_interval)
 
     model = PPO.load(model_filepath)
-    env = DummyVecEnv([lambda : env_test])
+    env = CustomDummyVecEnv([make_env(i) for i in range(num_envs)])
     env = VecNormalize.load("trained_models/vec_normalize_" + model_filepath + ".pkl", env)
 
     env.training = False

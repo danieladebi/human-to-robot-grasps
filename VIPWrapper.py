@@ -257,8 +257,12 @@ class VIPWrapper(GymWrapper, Env):
             vip_reward = self.reward_span * normalized_vip_distance + self.vip_reward_min
             if self.vip_reward_type == 'add':
                 reward += vip_reward
-            else:
+            elif self.vip_reward_type == 'multiply':
                 reward *= vip_reward
+            elif self.vip_reward_type == 'replace':
+                reward = vip_reward
+            else:
+                raise ValueError('Invalid VIP reward type')
 
         terminated = done
         truncated = False
