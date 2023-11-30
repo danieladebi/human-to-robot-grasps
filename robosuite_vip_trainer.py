@@ -8,6 +8,7 @@ import os
 import cv2
 
 from robosuite.environments.base import register_env
+from gymnasium import register
 
 from stable_baselines3 import PPO, SAC
 from stable_baselines3.common.save_util import save_to_zip_file, load_from_zip_file
@@ -34,6 +35,26 @@ task_name_to_env_name_map = {"lift" : "Lift",
                              "square" : "Square",
                              "transport": "Transport",
                              "tool_hang": "Tool_Hang"}
+
+class CustomDummyVecEnv(DummyVecEnv):
+    def reset(self):
+        for env_idx in range(self.num_envs):
+            obs, *_ = self.envs[env_idx].reset()
+            self._save_obs(env_idx, obs)
+        return self._obs_from_buf()
+
+    def step_wait(self):
+
+        for env_idx in range(self.num_envs):
+            obs, rew, terminated, truncated, info = self.envs[env_idx].step(self.actions[env_idx])
+            self.buf_rews[env_idx] = rew
+            self.buf_dones[env_idx] = terminated | truncated
+            self.buf_infos[env_idx] = info
+            if terminated | truncated:
+                obs, *_ = self.envs[env_idx].reset()
+            self._save_obs(env_idx, obs)
+        return (self._obs_from_buf(), self.buf_rews, self.buf_dones, self.buf_infos)
+
 
 
 def trainer(args):
@@ -80,7 +101,15 @@ def trainer(args):
             
     vip_model = load_vip()
     vip_model.eval()
-    env = VIPWrapper(rs_env, vip_model, vip_goal,
+    
+    def make_env(rank, seed=0):
+        """
+        Utility function for multiprocessed env.
+        :param rank: (int) index of the subprocess
+        :param seed: (int) the initial seed for RNG
+        """
+        def _init():
+            env = VIPWrapper(rs_env, vip_model, vip_goal,
                      use_vip_embedding_obs=args.use_vip_embedding_obs,
                      use_hand_pose_obs=args.use_hand_pose_obs,
                      use_vip_reward=args.use_vip_reward,
@@ -88,15 +117,14 @@ def trainer(args):
                      vip_reward_min=args.vip_reward_min,
                      vip_reward_max=args.vip_reward_max,
                      vip_reward_interval=args.vip_reward_interval)
+            # env.seed(seed + rank)
+            env = Monitor(env)
+            return env
+        return _init
 
-    def wrap_env(env):
-        wrapped_env = Monitor(env) # needed for extracting eprewmean and eplenmean
-        wrapped_env = DummyVecEnv([lambda: wrapped_env]) # Needed for all environments (e.g. used for multi-processing)
-        # getting some gym box error when uncommenting below
-        # wrapped_env = VecNormalize(wrapped_env) # Needed for improving training when using MuJoCo envs?
-        return wrapped_env
-
-    # env = wrap_env(env)
+    num_envs = 1
+    env = CustomDummyVecEnv([make_env(i) for i in range(num_envs)])
+    env = VecNormalize(env, norm_obs=True, norm_reward=False)
     # get the number of folders in the trained_models directory
     base_folder = os.path.join('trained_models', task_name)
     children_files = os.listdir(base_folder)
@@ -118,8 +146,7 @@ def trainer(args):
     model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
 
     model.save(model_filepath)
-    
-    # env.save('trained_models/vec_normalize_' + filename + '.pkl') # Save VecNomralize statistics
+    env.save('trained_models/vec_normalize_' + model_filepath + '.pkl') # Save VecNormalize statistics
 
     rs_test_env = EnvUtils.create_env_from_metadata(
         env_meta=env_meta,
@@ -140,7 +167,7 @@ def trainer(args):
 
     model = PPO.load(model_filepath)
     env = DummyVecEnv([lambda : env_test])
-    # env = VecNormalize.load("trained_models/vec_normalize_" + filename + ".pkl", env)
+    env = VecNormalize.load("trained_models/vec_normalize_" + model_filepath + ".pkl", env)
 
     env.training = False
     env.norm_reward = False

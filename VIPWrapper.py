@@ -1,12 +1,12 @@
 from robosuite.wrappers import GymWrapper
-from gym.core import Env
+from gymnasium.core import Env
 import numpy as np
-from gym import spaces
 import torchvision.transforms as T
 from PIL import Image
 import cv2
 import torch
 import hand_pose_model
+from gymnasium import spaces
 
 class VIPWrapper(GymWrapper, Env):
     """
@@ -187,7 +187,7 @@ class VIPWrapper(GymWrapper, Env):
             ob_lst.append(np.array(embedding_dict[key]).flatten())
         return np.concatenate([flattened_obs] + ob_lst)
     
-    def reset(self):
+    def reset(self, seed = None):
         """
         Extends env reset method to return flattened observation instead of normal OrderedDict.
 
@@ -260,7 +260,9 @@ class VIPWrapper(GymWrapper, Env):
             else:
                 reward *= vip_reward
 
-        return obs, reward, done, info
+        terminated = done
+        truncated = False
+        return obs, reward, terminated, truncated, info
 
     def seed(self, seed=None):
         """
