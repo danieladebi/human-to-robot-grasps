@@ -28,7 +28,8 @@ class VIPWrapper(GymWrapper, Env):
                  use_hand_pose_obs=True,
                  use_vip_reward=True, vip_reward_type='add', 
                  vip_reward_min=-1, vip_reward_max=1,
-                 vip_reward_interval=1, keys=None):
+                 vip_reward_interval=1, keys=None,
+                 discrete_action=True):
         self.vip_model = vip_model
         self.vip_model = self.vip_model.to('cuda')
         self.vip_model.eval()
@@ -126,8 +127,25 @@ class VIPWrapper(GymWrapper, Env):
         high = np.inf * np.ones(self.obs_dim)
         low = -high
         self.observation_space = spaces.Box(low=low, high=high)
+        
         low, high = self.env.action_spec
-        self.action_space = spaces.Box(low=low, high=high)
+        self.base_action_space = spaces.Box(low=low, high=high)
+        
+        self.discrete_action = discrete_action
+
+        if self.discrete_action:
+            # original action space is OSC_POSE controller and whether to open/close gripper, so 6D + 1D
+            # 2 actions per position dimension
+            n_actions = 3 * 2
+            # 2 actions per orientation dimension
+            n_actions += 3 * 2
+            # 2 actions for gripper
+            n_actions += 2
+            # discrete action space
+            self.n_actions = n_actions
+            self.action_space = spaces.Discrete(n_actions)
+        else:
+            self.action_space = self.base_action_space
         
     def get_vip_embedding(self, img):
         # look like robosuite already uses BGR so let's omit line below
@@ -162,6 +180,22 @@ class VIPWrapper(GymWrapper, Env):
         embedding = embedding.cpu().detach().numpy()
         
         return embedding, pred_hp
+    
+    def get_action(self, action):
+        if self.discrete_action:
+            # original action space is OSC_POSE controller and whether to open/close gripper, so 6D + 1D
+            # 2 actions per position dimension
+            action_idx = action // 2
+            action_val = -1 if action % 2 == 0 else 1
+            action_for_base_env = np.zeros(7, dtype=np.float32)
+            # discrete actions:
+            # move up, move down, move left, move right, move forward, move backward, 
+            # same thing for orientation (but not sure if needed for lift!)
+            # open/close gripper
+            action_for_base_env[action_idx] = action_val
+        else:
+            action_for_base_env = action
+        return action_for_base_env
 
 
     def _flatten_obs(self, obs_dict, verbose=False):
@@ -224,7 +258,8 @@ class VIPWrapper(GymWrapper, Env):
                 - (bool) whether the current episode is completed or not
                 - (dict) misc information
         """
-        ob_dict, reward, done, info = self.env.step(action)
+        base_env_action = self.get_action(action)
+        ob_dict, reward, done, info = self.env.step(base_env_action)
         self.latest_obs_dict = ob_dict
         flattened_obs = self._flatten_obs(ob_dict)
                 
