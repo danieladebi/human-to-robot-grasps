@@ -76,9 +76,9 @@ def evaluator(model_folder, n_eval_eps, n_vids):
 
     model = PPO.load(model_filepath)
     
-    if args.model == 'ppo':
+    if training_args.model == 'ppo':
         model = PPO.load(model_filepath)
-    elif args.model == 'a2c':
+    elif training_args.model == 'a2c':
         model = A2C.load(model_filepath)
     else:
         raise Exception('Model not supported')
