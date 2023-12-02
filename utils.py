@@ -7,6 +7,7 @@ from VIPGoalLoader import VIPGoalLoader
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import VecNormalize
 from vip import load_vip
+import os
 
 task_name_to_env_name_map = {"lift" : "Lift",
                              "can" : "Can",
@@ -32,14 +33,21 @@ class CustomDummyVecEnv(DummyVecEnv):
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), self.buf_rews, self.buf_dones, self.buf_infos)
     
-def get_vip_wrapped_env(task_name, args):
+def get_vip_wrapped_env(task_name, args, load_vec_normalize=False, model_filepath=None, use_frontview=False):
     vip_goal_loader = VIPGoalLoader(task_name)
     vip_goal_loader.load_dataset()
     vip_goal = vip_goal_loader.get_random_goal_image()
 
     env_meta = FileUtils.get_env_metadata_from_dataset(vip_goal_loader.processed_dataset_path)
     env_meta['env_kwargs']['use_object_obs'] = False
-    env_meta['env_kwargs']['camera_names'] = 'agentview'
+    env_meta['env_kwargs']['use_camera_obs'] = True
+    if use_frontview:
+        vid_dims = 512# 2048
+        env_meta['env_kwargs']['camera_heights'] = [84, vid_dims]
+        env_meta['env_kwargs']['camera_widths'] = [84, vid_dims]
+        env_meta['env_kwargs']['camera_names'] = ['agentview', 'frontview']
+    else:
+        env_meta['env_kwargs']['camera_names'] = 'agentview'
 
     rs_env = EnvUtils.create_env_from_metadata(
         env_meta=env_meta,
@@ -75,5 +83,9 @@ def get_vip_wrapped_env(task_name, args):
 
     num_envs = 1
     env = CustomDummyVecEnv([make_env(i) for i in range(num_envs)])
-    return VecNormalize(env, norm_obs=True, norm_reward=True)
+    if load_vec_normalize:
+        env = VecNormalize.load(os.path.join(model_filepath + '_vec_normalize.pkl'), env)
+    else:
+        env = VecNormalize(env, norm_obs=True, norm_reward=True)
+    return env
 

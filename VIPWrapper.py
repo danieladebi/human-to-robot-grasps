@@ -76,7 +76,7 @@ class VIPWrapper(GymWrapper, Env):
                 keys += ["object-state"]
             # Add image obs if requested
             if self.env.use_camera_obs:
-                cam_data = [f"{cam_name}_image" for cam_name in self.env.camera_names]
+                cam_data = [f"{cam_name}_image" for cam_name in self.env.camera_names if cam_name != 'frontview']
                 if self.use_vip_embedding_obs:
                     embedding_keys += cam_data
                 else:
@@ -231,10 +231,10 @@ class VIPWrapper(GymWrapper, Env):
         ob_dict = self.env.reset()
         embedding_dict = {}
         for key in ob_dict:
-            if self.use_vip_embedding_obs and self.use_hand_pose_obs and 'image' in key:
+            if self.use_vip_embedding_obs and self.use_hand_pose_obs and 'agentview_image' in key:
                 embedding_dict[key + '_embedding'], embedding_dict[key + '_hand_pose'] = self.get_both_embeddings(ob_dict[key])
             else:
-                if self.use_vip_embedding_obs and 'image' in key:
+                if self.use_vip_embedding_obs and 'agentview_image' in key:
                     embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
                 if self.use_hand_pose_obs and 'image' in key:
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
@@ -268,12 +268,12 @@ class VIPWrapper(GymWrapper, Env):
         embedding_dict = {}
 
         for key in ob_dict:
-            if (self.use_vip_embedding_obs or use_vip_reward) and self.use_hand_pose_obs and 'image' in key:
+            if (self.use_vip_embedding_obs or use_vip_reward) and self.use_hand_pose_obs and 'agentview_image' in key:
                 embedding_dict[key + '_embedding'], embedding_dict[key + '_hand_pose'] = self.get_both_embeddings(ob_dict[key])
             else:
-                if (self.use_vip_embedding_obs or use_vip_reward) and 'image' in key:
+                if (self.use_vip_embedding_obs or use_vip_reward) and 'agentview_image' in key:
                     embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
-                if self.use_hand_pose_obs and 'image' in key:
+                if self.use_hand_pose_obs and 'agentview_image' in key:
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
     
         obs = flattened_obs

@@ -3,6 +3,7 @@ from stable_baselines3 import PPO, A2C
 from utils import get_vip_wrapped_env
 import argparse
 from stable_baselines3.common.callbacks import ProgressBarCallback
+from robosuite_vip_evaluator import evaluator
 
 
 def trainer(args):
@@ -26,23 +27,30 @@ def trainer(args):
         for arg in vars(args):
             f.write("%s,%s\n"%(arg,getattr(args, arg)))
 
-    if args.discrete_actions:
+    if args.model == 'ppo':
         model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard") # PPO
-        # model = A2C("MlpPolicy", env, verbose=1, tensorboard_log=f"sac_{task_name}_tensorboard") # A2C
+    elif args.model == 'a2c':
+        model = A2C("MlpPolicy", env, verbose=1, tensorboard_log=f"sac_{task_name}_tensorboard") # A2C
     else:
-        model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard") # PPO
+        raise Exception('Model not supported')
     model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
 
     model.save(model_filepath)
     env.save(os.path.join(model_filepath + '_vec_normalize.pkl')) # Save VecNormalize statistics
     env.close()
+    
+    # evaluate the model
+    evaluator(model_folder=model_folder, n_eval_eps=10, n_vids=5)
+    
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--task', type=str, default='lift')
     parser.add_argument('--seed', type=int, default=0)
     parser.add_argument('--n_steps', type=int, default=5e5)
+    parser.add_argument('--model', type=str, default='ppo')
     parser.add_argument('--discrete_actions', action='store_true', default=True)
+    parser.add_argument('--evaluate', action='store_true', default=True)
     
     # vip arguments
     parser.add_argument('--use_vip_embedding_obs', action='store_true', default=False)
