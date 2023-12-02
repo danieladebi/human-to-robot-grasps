@@ -1,5 +1,5 @@
 import os
-from stable_baselines3 import PPO, SAC, A2C, PPO2
+from stable_baselines3 import PPO, SAC, A2C
 from utils import get_vip_wrapped_env, task_name_to_env_name_map
 import argparse
 from stable_baselines3.common.callbacks import ProgressBarCallback
