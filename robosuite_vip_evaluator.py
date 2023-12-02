@@ -1,5 +1,5 @@
 import os
-from stable_baselines3 import PPO, SAC, A2C
+from stable_baselines3 import PPO, SAC, A2C, PPO2
 from utils import get_vip_wrapped_env, task_name_to_env_name_map
 import argparse
 from stable_baselines3.common.callbacks import ProgressBarCallback
@@ -78,6 +78,8 @@ def evaluator(model_folder, n_eval_eps, n_vids):
     
     if args.model == 'ppo':
         model = PPO.load(model_filepath)
+    elif args.model == 'ppo2':
+        model = PPO2.load(model_filepath)
     elif args.model == 'a2c':
         model = A2C.load(model_filepath)
     else:
