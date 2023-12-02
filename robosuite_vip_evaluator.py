@@ -78,8 +78,6 @@ def evaluator(model_folder, n_eval_eps, n_vids):
     
     if args.model == 'ppo':
         model = PPO.load(model_filepath)
-    elif args.model == 'ppo2':
-        model = PPO2.load(model_filepath)
     elif args.model == 'a2c':
         model = A2C.load(model_filepath)
     else:

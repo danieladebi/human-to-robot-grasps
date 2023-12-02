@@ -1,5 +1,5 @@
 import os
-from stable_baselines3 import PPO, PPO2, A2C
+from stable_baselines3 import PPO, A2C
 from utils import get_vip_wrapped_env
 import argparse
 from stable_baselines3.common.callbacks import ProgressBarCallback
@@ -29,8 +29,6 @@ def trainer(args):
 
     if args.model == 'ppo':
         model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard")
-    elif args.model == 'ppo2':
-        model = PPO2("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo2_{task_name}_tensorboard")
     elif args.model == 'a2c':
         model = A2C("MlpPolicy", env, verbose=1, tensorboard_log=f"sac_{task_name}_tensorboard") 
     else:
