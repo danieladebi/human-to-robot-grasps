@@ -106,15 +106,17 @@ class VIPWrapper(GymWrapper, Env):
             embedding_dict = {}
             if self.use_vip_embedding_obs:
                 for key in obs:
-                    if 'image' in key:
+                    if 'agentview_image' in key:
                         embedding_dict[key + '_embedding'] = self.get_vip_embedding(obs[key])
             if self.use_hand_pose_obs:
                 for key in obs:
-                    if 'image' in key:
+                    if 'agentview_image' in key:
                         embedding_dict[key + '_hand_pose'] = self.get_hand_pose(obs[key])
         start_img = obs['agentview_image']
         if self.use_vip_embedding_obs:
             del obs['agentview_image']
+            if 'frontview_image' in obs:
+                del obs['frontview_image']
         flat_ob = self._flatten_obs(obs)
         flat_ob = self.add_embedding_flattened_obs(flat_ob, embedding_dict)
 
@@ -236,7 +238,7 @@ class VIPWrapper(GymWrapper, Env):
             else:
                 if self.use_vip_embedding_obs and 'agentview_image' in key:
                     embedding_dict[key + '_embedding'] = self.get_vip_embedding(ob_dict[key])
-                if self.use_hand_pose_obs and 'image' in key:
+                if self.use_hand_pose_obs and 'agentview_image' in key:
                     embedding_dict[key + '_hand_pose'] = self.get_hand_pose(ob_dict[key])
         flattened_obs = self._flatten_obs(ob_dict)
         if self.use_vip_embedding_obs or self.use_hand_pose_obs:
