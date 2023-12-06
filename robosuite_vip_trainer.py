@@ -8,7 +8,16 @@ from robosuite_vip_evaluator import evaluator
 
 def trainer(args):
     task_name = args.task
-    env = get_vip_wrapped_env(task_name, args)
+    
+    assert not (args.use_vip_embedding_obs and args.use_r3m_reward), 'Cannot use both VIP embedding obs and R3M reward'
+    assert not (args.use_vip_embedding_obs and args.use_r3m_embedding_obs), 'Cannot use both VIP embedding obs and R3M embedding obs'
+    assert not (args.use_vip_reward and args.use_r3m_reward), 'Cannot use both VIP reward and R3M reward'
+    assert not (args.use_r3m_embedding_obs and args.use_vip_reward), 'Cannot use both R3M embedding obs and VIP reward'
+    
+    embedding_model = 'vip'
+    if args.use_r3m_embedding_obs or args.use_r3m_reward:
+        embedding_model = 'r3m'
+    env = get_vip_wrapped_env(task_name, args, embedding_model=embedding_model)
 
     # get the number of folders in the trained_models directory
     base_folder = os.path.join('trained_models', task_name)
@@ -30,9 +39,10 @@ def trainer(args):
     if args.model == 'ppo':
         model = PPO("MlpPolicy", env, verbose=1, tensorboard_log=f"ppo_{task_name}_tensorboard")
     elif args.model == 'a2c':
-        model = A2C("MlpPolicy", env, verbose=1, tensorboard_log=f"sac_{task_name}_tensorboard") 
+        model = A2C("MlpPolicy", env, verbose=1, tensorboard_log=f"a2c_{task_name}_tensorboard") 
     else:
         raise Exception('Model not supported')
+
     model.learn(total_timesteps=args.n_steps, tb_log_name=model_folder, progress_bar=True)
 
     model.save(model_filepath)
@@ -54,8 +64,10 @@ if __name__ == '__main__':
     
     # vip arguments
     parser.add_argument('--use_vip_embedding_obs', action='store_true', default=False)
+    parser.add_argument('--use_r3m_embedding_obs', action='store_true', default=False)
     parser.add_argument('--use_hand_pose_obs', action='store_true', default=False)
     parser.add_argument('--use_vip_reward', action='store_true', default=False)
+    parser.add_argument('--use_r3m_reward', action='store_true', default=False)
     parser.add_argument('--vip_reward_type', type=str, default='replace')
     parser.add_argument('--vip_reward_min', type=float, default=-1)
     parser.add_argument('--vip_reward_max', type=float, default=1)

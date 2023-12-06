@@ -33,7 +33,8 @@ class CustomDummyVecEnv(DummyVecEnv):
             self._save_obs(env_idx, obs)
         return (self._obs_from_buf(), self.buf_rews, self.buf_dones, self.buf_infos)
     
-def get_vip_wrapped_env(task_name, args, load_vec_normalize=False, model_filepath=None, use_frontview=False):
+def get_vip_wrapped_env(task_name, args, load_vec_normalize=False, model_filepath=None, use_frontview=False,
+                        embedding_model='vip'):
     vip_goal_loader = VIPGoalLoader(task_name)
     vip_goal_loader.load_dataset()
     vip_goal = vip_goal_loader.get_random_goal_image()
@@ -58,8 +59,15 @@ def get_vip_wrapped_env(task_name, args, load_vec_normalize=False, model_filepat
     )
     rs_env = rs_env.env
 
-    vip_model = load_vip()
-    vip_model.eval()
+    if embedding_model == 'vip':
+        vip_model = load_vip()
+        vip_model.eval()
+    elif embedding_model == 'r3m':
+        from r3m import load_r3m
+        vip_model = load_r3m("resnet50")
+        vip_model.eval()
+    else:
+        raise Exception('Invalid embedding model')
     
     def make_env(rank, seed=0):
         """
