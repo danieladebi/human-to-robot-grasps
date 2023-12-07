@@ -61,6 +61,7 @@ if __name__ == '__main__':
     parser.add_argument('--model', type=str, default='ppo')
     parser.add_argument('--discrete_actions', action='store_true', default=True)
     parser.add_argument('--evaluate', action='store_true', default=True)
+    parser.add_argument('--n_bins', type=int, default=4)
     
     # vip arguments
     parser.add_argument('--use_vip_embedding_obs', action='store_true', default=False)

@@ -29,7 +29,7 @@ class VIPWrapper(GymWrapper, Env):
                  use_vip_reward=True, vip_reward_type='add', 
                  vip_reward_min=-1, vip_reward_max=1,
                  vip_reward_interval=1, keys=None,
-                 discrete_action=True):
+                 discrete_action=True, osc_bins=4):
         self.vip_model = vip_model
         self.vip_model = self.vip_model.to('cuda')
         self.vip_model.eval()
@@ -46,6 +46,8 @@ class VIPWrapper(GymWrapper, Env):
         self.vip_reward_max = vip_reward_max
         self.reward_span = vip_reward_max - vip_reward_min
         self.curr_vip_reward_interval = 1
+        
+        self.osc_bins = osc_bins
         
         # Run super method
         super().__init__(env=env)
@@ -137,13 +139,7 @@ class VIPWrapper(GymWrapper, Env):
 
         if self.discrete_action:
             # original action space is OSC_POSE controller and whether to open/close gripper, so 6D + 1D
-            # 2 actions per position dimension
-            n_actions = 3 * 2
-            # 2 actions per orientation dimension
-            n_actions += 3 * 2
-            # 2 actions for gripper
-            n_actions += 2
-            # discrete action space
+            n_actions = 7 * self.osc_bins
             self.n_actions = n_actions
             self.action_space = spaces.Discrete(n_actions)
         else:
@@ -187,8 +183,9 @@ class VIPWrapper(GymWrapper, Env):
         if self.discrete_action:
             # original action space is OSC_POSE controller and whether to open/close gripper, so 6D + 1D
             # 2 actions per position dimension
-            action_idx = action // 2
-            action_val = -1 if action % 2 == 0 else 1
+            action_idx = action // self.osc_bins
+            # get action value between -1 and 1
+            action_val = (action % self.osc_bins) / (self.osc_bins - 1) * 2 - 1
             action_for_base_env = np.zeros(7, dtype=np.float32)
             # discrete actions:
             # move up, move down, move left, move right, move forward, move backward, 

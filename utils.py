@@ -83,7 +83,8 @@ def get_vip_wrapped_env(task_name, args, load_vec_normalize=False, model_filepat
                     vip_reward_type=args.vip_reward_type,
                     vip_reward_min=args.vip_reward_min,
                     vip_reward_max=args.vip_reward_max,
-                    vip_reward_interval=args.vip_reward_interval)
+                    vip_reward_interval=args.vip_reward_interval,
+                    osc_bins=args.n_bins,)
             # env.seed(seed + rank)
             env = Monitor(env)
             return env
